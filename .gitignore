@@ -1,0 +1,12 @@
+# React (Frontend)
+node_modules/
+dist/
+.env
+
+# Python/FastAPi (Backend)
+__pycache__/
+venv/
+env/
+.pytest_cache/
+*.pyc
+.env
