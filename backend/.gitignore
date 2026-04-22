@@ -129,3 +129,7 @@ cython_debug/
 
 # Docker
 docker-compose.override.yml
+
+# Machine Learning
+ml_pipeline/data/*.csv
+ml_pipeline/saved_models/*
