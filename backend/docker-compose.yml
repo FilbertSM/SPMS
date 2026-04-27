@@ -67,9 +67,15 @@ services:
       MARIADB_USER: spms_user
       MARIADB_PASSWORD: spms_secure_password
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - mariadb_data:/var/lib/mysql
+      # ADDED: Map the local folder for CSV imports
+      - ./simulation_csvs:/var/lib/mysql-files
+      # ADDED: Map the initialization script folder so MariaDB finds 01-init.sql
+      - ./db_init:/docker-entrypoint-initdb.d
+    # ADDED: Override strict security to allow the LOAD DATA command
+    command: --secure-file-priv=/var/lib/mysql-files
     networks:
       - spms_network
     healthcheck:
