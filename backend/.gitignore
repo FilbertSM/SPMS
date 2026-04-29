@@ -133,3 +133,6 @@ docker-compose.override.yml
 # Machine Learning
 ml_pipeline/data/*.csv
 ml_pipeline/saved_models/*
+
+**/db_init/*.sql
+**/simulation_csvs/*.csv

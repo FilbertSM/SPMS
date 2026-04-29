@@ -27,3 +27,5 @@ venv.bak/
 .pytest_cache/
 .coverage
 htmlcov/
+db_init/
+simulation_csvs/
