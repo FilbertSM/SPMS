@@ -1,0 +1,99 @@
+import { Link, useNavigate } from 'react-router-dom';
+
+const Login = () => {
+  const navigate = useNavigate();
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    // TODO: Integrasikan dengan endpoint login backend.
+    // Catatan keamanan: Password yang dikirim akan diverifikasi dengan hash SHA-256 dan mengembalikan token JWT.
+    
+    // Simulasi login sukses, arahkan ke Dashboard
+    navigate('/');
+  };
+
+  return (
+    <div className="min-h-screen flex bg-[#f4f7f6] font-body">
+      {/* Kiri: Branding & Visual */}
+      <div className="hidden lg:flex lg:w-1/2 bg-[#1b263b] relative overflow-hidden items-center justify-center p-12">
+        <div className="absolute top-0 left-0 w-full h-full opacity-10">
+          <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <path d="M0,100 C30,60 70,40 100,0 L100,100 Z" fill="#ffffff" />
+          </svg>
+        </div>
+        <div className="relative z-10 text-white max-w-lg">
+          <div className="flex items-center gap-3 mb-8">
+            <span className="material-symbols-outlined text-4xl text-[#2ecc71]">precision_manufacturing</span>
+            <h1 className="text-3xl font-extrabold font-headline tracking-tight">PT. Saka Farma</h1>
+          </div>
+          <h2 className="text-5xl font-black font-headline mb-6 leading-tight">Secure Predictive Maintenance System</h2>
+          <p className="text-[#c5c6cd] text-lg leading-relaxed mb-8">
+            Enterprise-grade monitoring and anomaly detection for PMA Granulator and critical assets.
+          </p>
+          <div className="flex items-center gap-2 text-sm font-bold text-[#2ecc71] uppercase tracking-widest font-label">
+            <span className="w-2 h-2 rounded-full bg-[#2ecc71] animate-pulse"></span>
+            System Online • AES-256 Encrypted
+          </div>
+        </div>
+      </div>
+
+      {/* Kanan: Form Login */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 sm:p-12">
+        <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-xl border border-[#c5c6cd]/20">
+          <div className="mb-8 text-center lg:text-left">
+            <h3 className="text-2xl font-bold text-[#1b263b] font-headline">Welcome back</h3>
+            <p className="text-[#45474d] text-sm mt-2">Enter your credentials to access the SPMS dashboard.</p>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div>
+              <label className="block text-[11px] font-bold text-[#45474d] uppercase tracking-widest mb-2 font-label">
+                Employee ID / Email
+              </label>
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#45474d]">badge</span>
+                <input 
+                  type="text" 
+                  className="w-full pl-10 pr-4 py-3 bg-[#f1f4f3] border border-transparent rounded-lg focus:bg-white focus:border-[#1b263b] focus:ring-2 focus:ring-[#1b263b]/10 outline-none transition-all text-[#1b263b] font-medium"
+                  placeholder="e.g. 1024 or admin@sakafarma.com"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-[11px] font-bold text-[#45474d] uppercase tracking-widest font-label">
+                  Password
+                </label>
+                <a href="#" className="text-[11px] font-bold text-[#1b263b] hover:text-[#2ecc71] transition-colors">Forgot Password?</a>
+              </div>
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#45474d]">lock</span>
+                <input 
+                  type="password" 
+                  className="w-full pl-10 pr-4 py-3 bg-[#f1f4f3] border border-transparent rounded-lg focus:bg-white focus:border-[#1b263b] focus:ring-2 focus:ring-[#1b263b]/10 outline-none transition-all text-[#1b263b] font-medium"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+            </div>
+
+            <button 
+              type="submit" 
+              className="w-full py-3.5 mt-4 bg-[#1b263b] text-white text-sm font-bold uppercase tracking-widest rounded-lg hover:bg-[#051125] active:scale-[0.98] transition-all shadow-md font-label"
+            >
+              Sign In
+            </button>
+          </form>
+
+          <p className="mt-8 text-center text-sm text-[#45474d]">
+            Don't have an access account? <Link to="/register" className="font-bold text-[#1b263b] hover:text-[#2ecc71] transition-colors">Request Access</Link>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Login;
