@@ -1,15 +1,42 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 const Login = () => {
   const navigate = useNavigate();
+  // State untuk form
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    // TODO: Integrasikan dengan endpoint login backend.
-    // Catatan keamanan: Password yang dikirim akan diverifikasi dengan hash SHA-256 dan mengembalikan token JWT.
-    
-    // Simulasi login sukses, arahkan ke Dashboard
-    navigate('/');
+    setIsLoading(true);
+    setError('');
+
+    try {
+      // --- SIMULASI MOCKING API ---
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Tes error jika email salah
+      if (identifier === "salah@email.com") {
+        throw new Error("Invalid credentials. Please contact Administrator.");
+      }
+
+      // Simulasi token JWT buatan sendiri
+      const dummyToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy_payload.dummy_signature_123";
+      
+      // Simpan dummy JWT ke Local Storage
+      localStorage.setItem('spms_token', dummyToken);
+      
+      // Arahkan ke Dashboard
+      navigate('/');
+      
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -45,6 +72,14 @@ const Login = () => {
             <p className="text-[#45474d] text-sm mt-2">Enter your credentials to access the SPMS dashboard.</p>
           </div>
 
+          {/* Alert Error */}
+          {error && (
+            <div className="mb-4 p-3 bg-[#e74c3c]/10 border border-[#e74c3c]/20 text-[#e74c3c] text-xs font-bold rounded-lg flex items-center gap-2">
+              <span className="material-symbols-outlined text-sm">error</span>
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
               <label className="block text-[11px] font-bold text-[#45474d] uppercase tracking-widest mb-2 font-label">
@@ -54,6 +89,8 @@ const Login = () => {
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#45474d]">badge</span>
                 <input 
                   type="text" 
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 bg-[#f1f4f3] border border-transparent rounded-lg focus:bg-white focus:border-[#1b263b] focus:ring-2 focus:ring-[#1b263b]/10 outline-none transition-all text-[#1b263b] font-medium"
                   placeholder="e.g. 1024 or admin@sakafarma.com"
                   required
@@ -72,6 +109,8 @@ const Login = () => {
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#45474d]">lock</span>
                 <input 
                   type="password" 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 bg-[#f1f4f3] border border-transparent rounded-lg focus:bg-white focus:border-[#1b263b] focus:ring-2 focus:ring-[#1b263b]/10 outline-none transition-all text-[#1b263b] font-medium"
                   placeholder="••••••••"
                   required
@@ -81,9 +120,10 @@ const Login = () => {
 
             <button 
               type="submit" 
-              className="w-full py-3.5 mt-4 bg-[#1b263b] text-white text-sm font-bold uppercase tracking-widest rounded-lg hover:bg-[#051125] active:scale-[0.98] transition-all shadow-md font-label"
+              disabled={isLoading}
+              className="w-full py-3.5 mt-4 bg-[#1b263b] text-white text-sm font-bold uppercase tracking-widest rounded-lg hover:bg-[#051125] active:scale-[0.98] disabled:opacity-70 transition-all shadow-md font-label flex justify-center items-center gap-2"
             >
-              Sign In
+              {isLoading ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> : 'Sign In'}
             </button>
           </form>
 
