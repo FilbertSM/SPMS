@@ -59,13 +59,13 @@ const Register = () => {
             <path d="M100,100 C70,60 30,40 0,0 L0,100 Z" fill="#ffffff" />
           </svg>
         </div>
-        <div className="relative z-10 text-white max-w-lg">
-          <div className="w-16 h-16 bg-[#2ecc71]/20 rounded-xl flex items-center justify-center mb-8 border border-[#2ecc71]/30">
-            <span className="material-symbols-outlined text-4xl text-[#2ecc71]">shield_person</span>
+        <div className="relative z-10 text-white max-w-md text-center lg:text-left">
+          <div className="w-14 h-14 bg-[#2ecc71]/20 rounded-xl flex items-center justify-center mb-6 border border-[#2ecc71]/30 mx-auto lg:mx-0">
+            <span className="material-symbols-outlined text-3xl text-[#2ecc71]">shield_person</span>
           </div>
-          <h2 className="text-4xl font-black font-headline mb-4 leading-tight">Strict Access Control</h2>
-          <p className="text-[#c5c6cd] text-base leading-relaxed mb-8">
-            Registration requires administrator approval. All access logs are immutable and tracked via Role-Based Access Control (RBAC).
+          <h2 className="text-3xl font-black font-headline mb-4 leading-tight">Strict Access Control</h2>
+          <p className="text-[#828da7] text-sm leading-relaxed mb-8">
+            Registration requires administrator approval. All access logs are tracked via Role-Based Access Control (RBAC).
           </p>
         </div>
       </div>
@@ -87,7 +87,7 @@ const Register = () => {
             )}
 
             <div>
-              <label className="block text-[11px] font-bold text-[#45474d] uppercase tracking-widest mb-1.5 font-label">Full Name</label>
+              <label className="block text-[10px] font-bold text-[#45474d] uppercase tracking-widest mb-1.5 font-label">Full Name</label>
               <input 
                 type="text" 
                 value={fullName}
@@ -112,7 +112,7 @@ const Register = () => {
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-[#45474d] uppercase tracking-widest mb-1.5 font-label">Password</label>
+              <label className="block text-[10px] font-bold text-[#45474d] uppercase tracking-widest mb-1.5 font-label">Password</label>
               <input 
                 type="password" 
                 value={password}
@@ -141,7 +141,7 @@ const Register = () => {
             </div>
           </form>
 
-          <p className="mt-6 text-center text-sm text-[#45474d]">
+          <p className="mt-6 text-center text-xs text-[#45474d]">
             Already approved? <Link to="/login" className="font-bold text-[#1b263b] hover:text-[#2ecc71] transition-colors">Sign In Here</Link>
           </p>
         </div>
