@@ -1,10 +1,12 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Alerts from './pages/Alerts';
 import Settings from './pages/Settings';
 import Login from './pages/Login';       
 import Register from './pages/Register';
+// 1. Import the Bouncer component you just created
+import ProtectedRoute from './components/Routes'; 
 
 const AuditLogs = () => (
   <div className="p-8 flex-1 overflow-y-auto bg-[#f1f4f3]">
@@ -17,13 +19,25 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* Rute Publik (Tanpa Sidebar & TopNav) */}
+        {/* 2. Changed root redirect: Send users to the app first. 
+               If they don't have a token, ProtectedRoute will catch them and bounce them to /login */}
+        <Route path="/" element={<Navigate to="/app" replace />} />
+
+        {/* Public Routes - No token required */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
-        {/* Rute Internal (Menggunakan Layout Sidebar & TopNav) */}
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Dashboard />} />
+        {/* Internal Routes - PROTECTED */}
+        {/* 3. Wrap the Layout inside ProtectedRoute. This acts as a master lock for all child routes below it. */}
+        <Route 
+          path="/app" 
+          element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Dashboard />} /> 
           <Route path="alerts" element={<Alerts />} />
           <Route path="audit" element={<AuditLogs />} />
           <Route path="settings" element={<Settings />} />

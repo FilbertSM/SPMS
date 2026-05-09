@@ -15,19 +15,26 @@ const Sidebar = () => {
         </div>
         
         <nav className="space-y-1">
-          <Link to="/" className="bg-[#ffffff] dark:bg-[#051125] text-[#051125] dark:text-[#6bfe9c] font-bold rounded-l-lg ml-2 px-4 py-3 flex items-center gap-3 transition-all">
+          {/* UPDATED: to="/app" */}
+          <Link to="/app" className="bg-[#ffffff] dark:bg-[#051125] text-[#051125] dark:text-[#6bfe9c] font-bold rounded-l-lg ml-2 px-4 py-3 flex items-center gap-3 transition-all">
             <span className="material-symbols-outlined">dashboard</span>
             <span className="text-sm font-medium">Dashboard</span>
           </Link>
-          <Link to="/alerts" className="text-[#45474d] dark:text-[#c5c6cd] px-4 py-3 flex items-center gap-3 hover:bg-[#f1f4f3] dark:hover:bg-[#051125]/50 transition-all">
+          
+          {/* UPDATED: to="/app/alerts" */}
+          <Link to="/app/alerts" className="text-[#45474d] dark:text-[#c5c6cd] px-4 py-3 flex items-center gap-3 hover:bg-[#f1f4f3] dark:hover:bg-[#051125]/50 transition-all">
             <span className="material-symbols-outlined">warning</span>
             <span className="text-sm font-medium">Alerts</span>
           </Link>
-          <Link to="/audit" className="text-[#45474d] dark:text-[#c5c6cd] px-4 py-3 flex items-center gap-3 hover:bg-[#f1f4f3] dark:hover:bg-[#051125]/50 transition-all">
+          
+          {/* UPDATED: to="/app/audit" */}
+          <Link to="/app/audit" className="text-[#45474d] dark:text-[#c5c6cd] px-4 py-3 flex items-center gap-3 hover:bg-[#f1f4f3] dark:hover:bg-[#051125]/50 transition-all">
             <span className="material-symbols-outlined">security</span>
             <span className="text-sm font-medium">Audit Logs</span>
           </Link>
-          <Link to="/settings" className="text-[#45474d] dark:text-[#c5c6cd] px-4 py-3 flex items-center gap-3 hover:bg-[#f1f4f3] dark:hover:bg-[#051125]/50 transition-all">
+          
+          {/* UPDATED: to="/app/settings" */}
+          <Link to="/app/settings" className="text-[#45474d] dark:text-[#c5c6cd] px-4 py-3 flex items-center gap-3 hover:bg-[#f1f4f3] dark:hover:bg-[#051125]/50 transition-all">
             <span className="material-symbols-outlined">settings</span>
             <span className="text-sm font-medium">Settings</span>
           </Link>
@@ -39,10 +46,13 @@ const Sidebar = () => {
             Log Ticket
         </button>
         <div className="space-y-1">
-          <Link to="/support" className="text-[#45474d] dark:text-[#c5c6cd] px-4 py-2 flex items-center gap-3 hover:bg-[#f1f4f3] dark:hover:bg-[#051125]/50 transition-all text-xs font-medium">
+          {/* UPDATED: to="/app/support" */}
+          <Link to="/app/support" className="text-[#45474d] dark:text-[#c5c6cd] px-4 py-2 flex items-center gap-3 hover:bg-[#f1f4f3] dark:hover:bg-[#051125]/50 transition-all text-xs font-medium">
             <span className="material-symbols-outlined text-sm">help</span> Support
           </Link>
-          <Link to="/status" className="text-[#45474d] dark:text-[#c5c6cd] px-4 py-2 flex items-center gap-3 hover:bg-[#f1f4f3] dark:hover:bg-[#051125]/50 transition-all text-xs font-medium">
+          
+          {/* UPDATED: to="/app/status" */}
+          <Link to="/app/status" className="text-[#45474d] dark:text-[#c5c6cd] px-4 py-2 flex items-center gap-3 hover:bg-[#f1f4f3] dark:hover:bg-[#051125]/50 transition-all text-xs font-medium">
             <span className="material-symbols-outlined text-sm">analytics</span> System Status
           </Link>
         </div>
