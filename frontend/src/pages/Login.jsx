@@ -1,15 +1,13 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import ForgotPasswordModal from './ForgotPasswordModal';
 
 const Login = () => {
+  // Setup Navigation
   const navigate = useNavigate();
-  // State untuk form
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
 
   // 1. Setup State to track user inputs and UI status
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
@@ -98,15 +96,7 @@ const Login = () => {
           )}
 
           <form onSubmit={handleLogin} className="space-y-5">
-            {/* Display Error Message if login fails */}
-            {error && (
-              <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg font-medium">
-                {error}
-              </div>
-            )}
-
             <div>
-              {/* Note: Updated label to just 'Company Email' since we removed Employee ID from the backend */}
               <label className="block text-[11px] font-bold text-[#45474d] uppercase tracking-widest mb-2 font-label">
                 Company Email
               </label>
@@ -128,14 +118,18 @@ const Login = () => {
                 <label className="text-[11px] font-bold text-[#45474d] uppercase tracking-widest font-label">
                   Password
                 </label>
-                <a href="#" className="text-[11px] font-bold text-[#1b263b] hover:text-[#2ecc71] transition-colors">Forgot Password?</a>
+                <button 
+                  type="button" 
+                  onClick={() => setIsModalOpen(true)} 
+                  className="text-xs font-bold text-[#1b263b] hover:text-[#2ecc71] transition-colors bg-transparent border-none cursor-pointer"
+                >
+                  Forgot Password?
+                </button>
               </div>
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#45474d]">lock</span>
                 <input 
                   type="password" 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 bg-[#f1f4f3] border border-transparent rounded-lg focus:bg-white focus:border-[#1b263b] focus:ring-2 focus:ring-[#1b263b]/10 outline-none transition-all text-[#1b263b] font-medium"
@@ -166,6 +160,12 @@ const Login = () => {
           </p>
         </div>
       </div>
+
+      {/* Place the Modal at the bottom of the main container */}
+      <ForgotPasswordModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+      />
     </div>
   );
 };

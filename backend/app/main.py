@@ -7,6 +7,12 @@ from sqlalchemy.orm import Session
 from app.core import security
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager # Fixes line 18
+from app.core.security import create_reset_token # Fixes line 150
+from app.utils.email import send_reset_email # Fixes line 151
+from pydantic import BaseModel
+from jose import jwt
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
 
 # NEW: Import your database engine and models.
 # (If you put these inside your 'app' folder, change this to: from app.database import engine, models)
@@ -14,6 +20,29 @@ from app.database.database import engine, SessionLocal
 
 # 2. Look in the 'app' folder -> 'database' folder, and import the 'models.py' file
 from app.database import models
+
+conf = ConnectionConfig(
+    MAIL_USERNAME = "jason_a@smaknasionalanglo.sch.id",
+    MAIL_PASSWORD = "dpxfvzcuqlvncbmv",
+    MAIL_FROM = "jason_a@smaknasionalanglo.sch.id",
+    MAIL_PORT = 587,
+    MAIL_SERVER = "smtp.gmail.com",
+    MAIL_STARTTLS = True,
+    MAIL_SSL_TLS = False,
+    USE_CREDENTIALS = True,
+    VALIDATE_CERTS = True
+)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # This code runs ON STARTUP
+    print("Starting up SPMS Backend...")
+    # If you had code in on_startup, put it here
+    
+    yield
+    
+    # This code runs ON SHUTDOWN
+    print("Shutting down SPMS Backend...")
 
 def get_application() -> FastAPI:
     # Tell SQLAlchemy to build the tables in MariaDB before starting the app.
@@ -126,3 +155,67 @@ def read_users_me(current_user: models.User = Depends(security.get_current_user)
     # If the token is missing or invalid, FastAPI blocks the request before it ever reaches this line.
     # If it gets here, the user is 100% authenticated.
     return current_user
+
+class EmailSchema(BaseModel):
+    email: str
+
+    
+
+@app.post("/forgot-password")
+async def forgot_password(request: schemas.ForgotPasswordRequest, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == request.email).first()
+    
+    if user:
+        reset_token = security.create_reset_token(data={"sub": user.email})
+        
+        # Build the reset link pointing to your React page
+        reset_link = f"http://localhost:5173/reset-password?token={reset_token}"
+        
+        # Create the email content
+        message = MessageSchema(
+            subject="SPMS - Password Reset Request",
+            recipients=[user.email],
+            body=f"""
+            <h3>Reset Your SPMS Password</h3>
+            <p>You requested a password reset for your account.</p>
+            <p>Click the link below to set a new password. This link expires in 15 minutes.</p>
+            <a href="{reset_link}">{reset_link}</a>
+            """,
+            subtype=MessageType.html
+        )
+
+        fm = FastMail(conf)
+        await fm.send_message(message)
+        
+    return {"message": "If this email is registered, a reset link has been sent."}
+
+
+class ResetPassword(BaseModel):
+    token: str
+    new_password: str
+
+@app.post("/api/reset-password")
+def reset_password(data: schemas.ResetPassword, db: Session = Depends(get_db)):
+    try:
+        # 1. Decode and verify the token
+        payload = jwt.decode(data.token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
+        email: str = payload.get("sub")
+        scope: str = payload.get("scope")
+        
+        # 2. Safety check: ensure this isn't a login token!
+        if scope != "password_reset":
+            raise HTTPException(status_code=401, detail="Invalid token scope")
+            
+    except jwt.JWTError:
+        raise HTTPException(status_code=401, detail="Token expired or invalid")
+
+    # 3. Find the user
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # 4. Hash the new password and save
+    user.hashed_password = security.get_password_hash(data.new_password)
+    db.commit()
+
+    return {"message": "Password updated successfully. You can now login."}

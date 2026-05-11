@@ -5,8 +5,10 @@ import Alerts from './pages/Alerts';
 import Settings from './pages/Settings';
 import Login from './pages/Login';       
 import Register from './pages/Register';
+import ResetPassword from './pages/ResetPassword';
 // 1. Import the Bouncer component you just created
 import ProtectedRoute from './components/Routes'; 
+import ForgotPassword from './pages/ForgotPassword';
 
 const AuditLogs = () => (
   <div className="p-8 flex-1 overflow-y-auto bg-[#f1f4f3]">
@@ -26,6 +28,8 @@ function App() {
         {/* Public Routes - No token required */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
 
         {/* Internal Routes - PROTECTED */}
         {/* 3. Wrap the Layout inside ProtectedRoute. This acts as a master lock for all child routes below it. */}

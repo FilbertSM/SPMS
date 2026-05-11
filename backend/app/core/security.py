@@ -6,6 +6,7 @@ from app.database.database import SessionLocal
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
+from app.core.config import settings
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 
@@ -60,3 +61,18 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         raise credentials_exception
         
     return user
+
+def create_reset_token(data: dict):
+    to_encode = data.copy()
+    
+    expires_delta = timedelta(minutes=15)
+    expire = datetime.utcnow() + expires_delta
+    
+    # Update the dictionary with expiration and scope
+    to_encode.update({
+        "exp": expire, 
+        "scope": "password_reset" 
+    })
+    
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt

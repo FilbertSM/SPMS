@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 
 class UserCreate(BaseModel):
     full_name: str
@@ -18,3 +18,10 @@ class UserResponse(BaseModel): # <--- This must match exactly
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+class ResetPassword(BaseModel):
+    token: str
+    new_password: str
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
