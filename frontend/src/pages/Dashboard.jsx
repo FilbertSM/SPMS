@@ -1,21 +1,21 @@
 const Dashboard = () => {
   return (
-    <div className="flex-1 overflow-y-auto p-8 bg-[#f1f4f3] space-y-8">
+    <div className="page-container bg-[#f1f4f3]">
       {/* Header Section: Status and Identity */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-[#ffffff] rounded-xl p-8 flex flex-col justify-between shadow-sm relative overflow-hidden">
+        <div className="panel-card lg:col-span-2 flex flex-col justify-between relative overflow-hidden">
           <div className="relative z-10">
-            <h2 className="text-4xl font-extrabold font-headline tracking-tight text-[#051125] mb-2">PMA Granulator #01</h2>
-            <p className="text-[#45474d] max-w-lg leading-relaxed">
+            <h2 className="heading-primary mb-2">PMA Granulator #01</h2>
+            <p className="text-subtitle max-w-lg leading-relaxed">
               System monitoring the wet granulation process. Real-time predictive maintenance enabled via LSTM neural network models.
             </p>
           </div>
           <div className="mt-8 flex gap-4 z-10">
-            <button className="px-6 py-3 bg-gradient-to-br from-[#051125] to-[#1b263b] text-white text-xs font-bold uppercase tracking-widest rounded-lg flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all">
+            <button className="btn-primary w-auto py-3 px-6 mt-0 bg-gradient-to-br from-[#051125] to-[#1b263b]">
               <span className="material-symbols-outlined text-sm">history</span>
               View Historical Data
             </button>
-            <button className="px-6 py-3 bg-[#e6e9e8] text-[#051125] text-xs font-bold uppercase tracking-widest rounded-lg flex items-center gap-2 hover:bg-[#e0e3e2] transition-colors">
+            <button className="btn-secondary py-3 px-6 bg-[#e6e9e8]">
               <span className="material-symbols-outlined text-sm">medical_services</span>
               Log Maintenance Ticket
             </button>
@@ -29,7 +29,7 @@ const Dashboard = () => {
         </div>
 
         {/* Status Box */}
-        <div className="bg-[#6bfe9c] rounded-xl p-8 flex flex-col items-center justify-center text-center space-y-4 shadow-md">
+        <div className="panel-card bg-[#6bfe9c] border-none flex flex-col items-center justify-center text-center space-y-4 shadow-md">
           <div className="w-20 h-20 rounded-full bg-white/30 flex items-center justify-center animate-pulse">
             <span className="material-symbols-outlined text-[#00743a] text-4xl" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
           </div>
@@ -47,14 +47,14 @@ const Dashboard = () => {
       {/* Telemetry & Insights Section */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Main Chart */}
-        <div className="lg:col-span-8 bg-[#ffffff] rounded-xl p-6 shadow-sm border border-[#c5c6cd]/10">
+        <div className="panel-card lg:col-span-8 p-6">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h4 className="font-headline font-bold text-[#051125] flex items-center gap-2">
+              <h4 className="heading-secondary text-lg flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#051125]">electric_bolt</span>
                 Motor Current vs LSTM Prediction
               </h4>
-              <p className="text-xs text-[#45474d] mt-1 font-body">Predictive analysis of motor load behavior</p>
+              <p className="text-subtitle text-xs mt-1">Predictive analysis of motor load behavior</p>
             </div>
             <div className="flex items-center gap-4 text-[10px] font-bold font-headline uppercase tracking-widest">
               <div className="flex items-center gap-2">
@@ -84,8 +84,8 @@ const Dashboard = () => {
         </div>
 
         {/* Anomaly Score Gauge */}
-        <div className="lg:col-span-4 bg-[#ffffff] rounded-xl p-6 shadow-sm flex flex-col">
-          <h4 className="font-headline font-bold text-[#051125] flex items-center gap-2 mb-6">
+        <div className="panel-card lg:col-span-4 p-6 flex flex-col">
+          <h4 className="heading-secondary text-lg flex items-center gap-2 mb-6">
             <span className="material-symbols-outlined text-[#1b263b]">psychology</span>
             Anomaly Score (MSE)
           </h4>
@@ -103,8 +103,6 @@ const Dashboard = () => {
           </div>
         </div>
       </section>
-      
-      {/* Kamu bisa menambahkan Bottom Row (Vibration & Sensor Health) di sini nanti */}
     </div>
   );
 };

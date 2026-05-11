@@ -1,17 +1,17 @@
 const Alerts = () => {
   return (
-    <div className="flex-1 overflow-y-auto p-8 bg-[#f4f7f6] space-y-10">
+    <div className="page-container space-y-10">
       {/* Header Section */}
       <section className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h2 className="font-headline font-bold text-3xl text-[#1b263b] tracking-tight">Active Machine Alerts</h2>
-          <p className="text-[#45474d] text-sm mt-1 font-body">Real-time anomaly detection and predictive maintenance triggers.</p>
+          <h2 className="heading-primary text-3xl">Active Machine Alerts</h2>
+          <p className="text-subtitle mt-1">Real-time anomaly detection and predictive maintenance triggers.</p>
         </div>
         <div className="flex gap-3">
-          <button className="px-4 py-2 bg-[#e0e3e2] text-[#181c1c] text-xs font-semibold uppercase tracking-wider rounded-md hover:bg-[#d7dbda] transition-colors flex items-center gap-2">
+          <button className="btn-secondary">
             <span className="material-symbols-outlined text-[18px]">filter_list</span> Filter
           </button>
-          <button className="px-4 py-2 bg-[#1b263b] text-white text-xs font-semibold uppercase tracking-wider rounded-md hover:opacity-90 transition-opacity flex items-center gap-2">
+          <button className="btn-primary py-2 px-4 w-auto mt-0">
             <span className="material-symbols-outlined text-[18px]">download</span> Export Report
           </button>
         </div>
@@ -24,7 +24,7 @@ const Alerts = () => {
           <div className="flex-grow p-5 flex flex-col lg:flex-row items-center gap-6">
             <div className="flex-shrink-0 w-full lg:w-48">
               <span className="inline-flex items-center px-2 py-0.5 rounded-sm bg-[#e74c3c]/10 text-[#e74c3c] text-[8px] font-black uppercase tracking-widest mb-2">Critical</span>
-              <h3 className="font-headline font-bold text-lg text-[#1b263b] mb-1">PMA Granulator #01</h3>
+              <h3 className="heading-secondary text-lg mb-1">PMA Granulator #01</h3>
               <div className="flex items-center gap-2 text-[10px] text-[#45474d] font-medium">
                 <span className="material-symbols-outlined text-[14px]">precision_manufacturing</span>
                 Line B • Pharma
@@ -66,10 +66,10 @@ const Alerts = () => {
             </div>
             
             <div className="flex flex-row lg:flex-col gap-2 w-full lg:w-48 lg:pl-6 lg:border-l lg:border-[#c5c6cd]/30">
-              <button className="flex-1 lg:w-full py-2 bg-[#e74c3c] text-white text-[11px] font-bold uppercase tracking-widest rounded-md hover:brightness-95 transition-all shadow-sm">
+              <button className="btn-danger flex-1 lg:w-full">
                 Acknowledge
               </button>
-              <button className="flex-1 lg:w-full py-2 bg-[#e0e3e2] text-[#1b263b] text-[11px] font-bold uppercase tracking-widest rounded-md hover:bg-[#d7dbda] transition-all">
+              <button className="btn-secondary flex-1 lg:w-full py-2 bg-[#e0e3e2] justify-center">
                 Log Ticket
               </button>
             </div>
@@ -81,7 +81,7 @@ const Alerts = () => {
           <div className="flex-grow p-5 flex flex-col lg:flex-row items-center gap-6">
             <div className="flex-shrink-0 w-full lg:w-48">
               <span className="inline-flex items-center px-2 py-0.5 rounded-sm bg-[#2ecc71]/20 text-[#00743a] text-[8px] font-black uppercase tracking-widest mb-2">Warning</span>
-              <h3 className="font-headline font-bold text-lg text-[#1b263b] mb-1">Blister Packager 04</h3>
+              <h3 className="heading-secondary text-lg mb-1">Blister Packager 04</h3>
               <div className="flex items-center gap-2 text-[10px] text-[#45474d] font-medium">
                 <span className="material-symbols-outlined text-[14px]">package</span>
                 North Area • Pack
@@ -123,10 +123,10 @@ const Alerts = () => {
             </div>
             
             <div className="flex flex-row lg:flex-col gap-2 w-full lg:w-48 lg:pl-6 lg:border-l lg:border-[#c5c6cd]/30">
-              <button className="flex-1 lg:w-full py-2 bg-[#006d37] text-white text-[11px] font-bold uppercase tracking-widest rounded-md hover:brightness-95 transition-all shadow-sm">
+              <button className="btn-success flex-1 lg:w-full">
                 Acknowledge
               </button>
-              <button className="flex-1 lg:w-full py-2 bg-[#e0e3e2] text-[#1b263b] text-[11px] font-bold uppercase tracking-widest rounded-md hover:bg-[#d7dbda] transition-all">
+              <button className="btn-secondary flex-1 lg:w-full py-2 bg-[#e0e3e2] justify-center">
                 Log Ticket
               </button>
             </div>
@@ -137,11 +137,11 @@ const Alerts = () => {
       {/* Historical Log Section */}
       <section className="space-y-6">
         <div className="flex items-center gap-4">
-          <h2 className="font-headline font-bold text-xl text-[#1b263b] tracking-tight">Resolved Alerts & Maintenance Log</h2>
+          <h2 className="heading-secondary text-xl">Resolved Alerts & Maintenance Log</h2>
           <div className="h-px flex-grow bg-[#e0e3e2]"></div>
         </div>
         
-        <div className="bg-white rounded-xl overflow-hidden border border-[#c5c6cd]/30">
+        <div className="panel-card p-0 overflow-hidden">
           <table className="w-full text-left border-collapse">
             <thead className="bg-[#f4f7f6]">
               <tr>

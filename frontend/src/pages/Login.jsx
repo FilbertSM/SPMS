@@ -19,12 +19,10 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      // 2. Prepare the data exactly as FastAPI's OAuth2 expects (Form Data, NOT JSON)
       const formData = new URLSearchParams();
-      formData.append('username', email); // FastAPI looks for 'username' by default
+      formData.append('username', email);
       formData.append('password', password);
 
-      // 3. Make the API Call to your backend
       const response = await fetch('http://127.0.0.1:8000/api/login', {
         method: 'POST',
         headers: {
@@ -33,18 +31,14 @@ const Login = () => {
         body: formData,
       });
 
-      // 4. Handle failed logins (e.g., wrong password)
       if (!response.ok) {
         throw new Error('Invalid email or password. Please try again.');
       }
 
-      // 5. Extract the JWT token and save it securely
       const data = await response.json();
       localStorage.setItem('spms_token', data.access_token);
       
       console.log("Authentication successful. Token secured.");
-
-      // 6. Redirect to the Dashboard
       navigate('/');
       
     } catch (err) {
@@ -55,9 +49,8 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex bg-[#f4f7f6] font-body">
-      {/* Left: Branding & Visual (Unchanged) */}
-      <div className="hidden lg:flex lg:w-1/2 bg-[#1b263b] relative overflow-hidden items-center justify-center p-12">
+    <div className="auth-container">
+      <div className="auth-left-panel">
         <div className="absolute top-0 left-0 w-full h-full opacity-10">
           <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
             <path d="M0,100 C30,60 70,40 100,0 L100,100 Z" fill="#ffffff" />
@@ -79,21 +72,12 @@ const Login = () => {
         </div>
       </div>
 
-      {/* Right: Login Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 sm:p-12">
-        <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-xl border border-[#c5c6cd]/20">
+      <div className="auth-right-panel">
+        <div className="auth-card">
           <div className="mb-8 text-center lg:text-left">
-            <h3 className="text-2xl font-bold text-[#1b263b] font-headline">Welcome back</h3>
-            <p className="text-[#45474d] text-sm mt-2">Enter your credentials to access the SPMS dashboard.</p>
+            <h3 className="heading-secondary">Welcome back</h3>
+            <p className="text-subtitle mt-2">Enter your credentials to access the SPMS dashboard.</p>
           </div>
-
-          {/* Alert Error */}
-          {error && (
-            <div className="mb-4 p-3 bg-[#e74c3c]/10 border border-[#e74c3c]/20 text-[#e74c3c] text-xs font-bold rounded-lg flex items-center gap-2">
-              <span className="material-symbols-outlined text-sm">error</span>
-              {error}
-            </div>
-          )}
 
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
@@ -106,7 +90,7 @@ const Login = () => {
                   type="email" 
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-[#f1f4f3] border border-transparent rounded-lg focus:bg-white focus:border-[#1b263b] focus:ring-2 focus:ring-[#1b263b]/10 outline-none transition-all text-[#1b263b] font-medium"
+                  className="input-icon-field"
                   placeholder="e.g. budi.p@sakafarma.com"
                   required
                 />
@@ -139,11 +123,7 @@ const Login = () => {
               </div>
             </div>
 
-            <button 
-              type="submit" 
-              disabled={isLoading}
-              className="w-full py-3.5 mt-4 bg-[#1b263b] text-white text-sm font-bold uppercase tracking-widest rounded-lg hover:bg-[#051125] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed transition-all shadow-md font-label flex justify-center items-center gap-2"
-            >
+            <button type="submit" disabled={isLoading} className="btn-primary">
               {isLoading ? (
                 <>
                   <span className="material-symbols-outlined animate-spin text-sm">sync</span>

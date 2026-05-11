@@ -27,3 +27,69 @@ body {
 ::-webkit-scrollbar-thumb {
   @apply bg-[#c5c6cd]/30 rounded-full hover:bg-[#c5c6cd]/50 transition-colors;
 }
+
+/* --- TAMBAHAN CLASS UNTUK MERAPIKAN JSX --- */
+@layer components {
+  /* Layout & Wrappers */
+  .page-container {
+    @apply flex-1 overflow-y-auto p-8 bg-[#f4f7f6] space-y-8;
+  }
+  .auth-container {
+    @apply min-h-screen flex bg-[#f4f7f6] font-body;
+  }
+  .auth-left-panel {
+    @apply hidden lg:flex lg:w-1/2 bg-[#1b263b] relative overflow-hidden items-center justify-center p-12;
+  }
+  .auth-right-panel {
+    @apply w-full lg:w-1/2 flex items-center justify-center p-8 sm:p-12;
+  }
+  
+  /* Cards */
+  .auth-card {
+    @apply w-full max-w-md bg-white p-8 rounded-2xl shadow-xl border border-[#c5c6cd]/20;
+  }
+  .panel-card {
+    @apply bg-white rounded-xl p-8 shadow-sm border border-[#c5c6cd]/20;
+  }
+
+  /* Typography */
+  .heading-primary {
+    @apply text-4xl font-extrabold font-headline tracking-tight text-[#051125];
+  }
+  .heading-secondary {
+    @apply text-2xl font-bold text-[#1b263b] font-headline;
+  }
+  .text-subtitle {
+    @apply text-[#45474d] text-sm;
+  }
+
+  /* Forms & Inputs */
+  .form-label {
+    @apply block text-[11px] font-bold text-[#45474d] uppercase tracking-widest font-label;
+  }
+  .input-field {
+    @apply w-full px-4 py-2.5 bg-[#f1f4f3] border border-transparent rounded-lg focus:bg-white focus:border-[#1b263b] focus:ring-2 focus:ring-[#1b263b]/10 outline-none transition-all text-[#1b263b] text-sm font-medium;
+  }
+  .input-icon-field {
+    @apply w-full pl-10 pr-4 py-3 bg-[#f1f4f3] border border-transparent rounded-lg focus:bg-white focus:border-[#1b263b] focus:ring-2 focus:ring-[#1b263b]/10 outline-none transition-all text-[#1b263b] font-medium;
+  }
+
+  /* Buttons */
+  .btn-primary {
+    @apply w-full py-3.5 bg-[#1b263b] text-white text-sm font-bold uppercase tracking-widest rounded-lg hover:bg-[#051125] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed transition-all shadow-md font-label flex justify-center items-center gap-2;
+  }
+  .btn-secondary {
+    @apply px-4 py-2 bg-[#e0e3e2] text-[#1b263b] text-xs font-bold uppercase tracking-widest rounded-md hover:bg-[#d7dbda] transition-colors flex items-center gap-2;
+  }
+  .btn-danger {
+    @apply py-2 bg-[#e74c3c] text-white text-[11px] font-bold uppercase tracking-widest rounded-md hover:brightness-95 transition-all shadow-sm;
+  }
+  .btn-success {
+    @apply py-2 bg-[#006d37] text-white text-[11px] font-bold uppercase tracking-widest rounded-md hover:brightness-95 transition-all shadow-sm;
+  }
+  
+  /* Alert Elements */
+  .alert-error-box {
+    @apply p-3 bg-[#e74c3c]/10 border border-[#e74c3c]/20 text-[#e74c3c] text-xs font-bold rounded-lg flex items-center gap-2;
+  }
+}

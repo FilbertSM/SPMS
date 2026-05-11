@@ -3,13 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 
 const Register = () => {
   const navigate = useNavigate();
-
-  // 1. Setup State to track user inputs
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  
-  // UI states for loading and errors
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -19,7 +15,6 @@ const Register = () => {
     setIsLoading(true);
 
     try {
-      // 2. Make the API Call to your backend using standard JSON
       const response = await fetch('http://127.0.0.1:8000/api/register', {
         method: 'POST',
         headers: {
@@ -32,14 +27,11 @@ const Register = () => {
         }),
       });
 
-      // 3. Handle errors (like if the email is already in the database)
       if (!response.ok) {
         const errData = await response.json();
-        // FastAPI returns errors in a 'detail' field
         throw new Error(errData.detail || 'Registration failed. Please check your inputs.');
       }
 
-      // 4. Success! Redirect to login page
       console.log("Account created successfully!");
       navigate('/login');
       
@@ -51,9 +43,8 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen flex bg-[#f4f7f6] font-body">
-      {/* Right: Branding & Visual */}
-      <div className="hidden lg:flex lg:w-1/2 bg-[#1b263b] relative overflow-hidden items-center justify-center p-12 order-2">
+    <div className="auth-container">
+      <div className="auth-left-panel order-2">
          <div className="absolute top-0 right-0 w-full h-full opacity-10">
           <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
             <path d="M100,100 C70,60 30,40 0,0 L0,100 Z" fill="#ffffff" />
@@ -70,65 +61,59 @@ const Register = () => {
         </div>
       </div>
 
-      {/* Left: Form Register */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 sm:p-12 order-1 overflow-y-auto">
-        <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-xl border border-[#c5c6cd]/20 my-auto">
+      <div className="auth-right-panel order-1 overflow-y-auto">
+        <div className="auth-card my-auto">
           <div className="mb-8 text-center lg:text-left">
-            <h3 className="text-2xl font-bold text-[#1b263b] font-headline">Request System Access</h3>
-            <p className="text-[#45474d] text-sm mt-2">Submit your details to gain SPMS credentials.</p>
+            <h3 className="heading-secondary">Request System Access</h3>
+            <p className="text-subtitle mt-2">Submit your details to gain SPMS credentials.</p>
           </div>
 
           <form onSubmit={handleRegister} className="space-y-4">
-            {/* Display Error Message if registration fails */}
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg font-medium">
+              <div className="alert-error-box">
+                <span className="material-symbols-outlined text-sm">error</span>
                 {error}
               </div>
             )}
 
             <div>
-              <label className="block text-[10px] font-bold text-[#45474d] uppercase tracking-widest mb-1.5 font-label">Full Name</label>
+              <label className="form-label mb-1.5">Full Name</label>
               <input 
                 type="text" 
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full px-4 py-2.5 bg-[#f1f4f3] border border-transparent rounded-lg focus:bg-white focus:border-[#1b263b] focus:ring-2 focus:ring-[#1b263b]/10 outline-none transition-all text-[#1b263b] text-sm"
+                className="input-field"
                 placeholder="e.g. Budi Prasetyo"
                 required
               />
             </div>
 
-            {/* Replaced Employee ID & Role with a single Email input */}
             <div>
-              <label className="block text-[11px] font-bold text-[#45474d] uppercase tracking-widest mb-1.5 font-label">Company Email</label>
+              <label className="form-label mb-1.5">Company Email</label>
               <input 
                 type="email" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2.5 bg-[#f1f4f3] border border-transparent rounded-lg focus:bg-white focus:border-[#1b263b] focus:ring-2 focus:ring-[#1b263b]/10 outline-none transition-all text-[#1b263b] text-sm"
+                className="input-field"
                 placeholder="e.g. budi.p@sakafarma.com"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-[#45474d] uppercase tracking-widest mb-1.5 font-label">Password</label>
+              <label className="form-label mb-1.5">Password</label>
               <input 
                 type="password" 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2.5 bg-[#f1f4f3] border border-transparent rounded-lg focus:bg-white focus:border-[#1b263b] focus:ring-2 focus:ring-[#1b263b]/10 outline-none transition-all text-[#1b263b] text-sm"
+                className="input-field"
                 placeholder="Create a strong password"
                 required
               />
             </div>
 
             <div className="pt-2">
-              <button 
-                type="submit" 
-                disabled={isLoading}
-                className="w-full py-3 bg-[#1b263b] text-white text-sm font-bold uppercase tracking-widest rounded-lg hover:bg-[#051125] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed transition-all shadow-md font-label flex justify-center items-center gap-2"
-              >
+              <button type="submit" disabled={isLoading} className="btn-primary mt-0">
                 {isLoading ? (
                   <>
                     <span className="material-symbols-outlined animate-spin text-sm">sync</span>
