@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from passlib.context import CryptContext
 from app.core.config import settings
 
+# 🛡️ Gunakan URL yang sama dengan endpoint login di main.py
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 
 def get_db():
@@ -18,10 +19,10 @@ def get_db():
         db.close()
 
 # --- JWT Configuration ---
-# In production, this SECRET_KEY must be moved to your .env file!
-SECRET_KEY = "spms-super-secret-development-key-change-me"
+# 🛡️ PENTING: Gunakan key ini agar sinkron dengan proses pembuatan token
+SECRET_KEY = "pma_granulator_secure_secret_key_2026"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 # Token expires in 1 hour
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -36,7 +37,7 @@ def create_access_token(data: dict):
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     
-    # This cryptographically signs the token so React can't forge it
+    # Menghasilkan token JWT
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
@@ -47,16 +48,18 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        # Decode the token using your secret key
+        # Mendekode token untuk mengambil identitas user
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: int = payload.get("user_id")
-        if user_id is None:
+        
+        # 🛡️ UPDATE: Mengambil 'sub' (email) sesuai dengan yang dikirim main.py
+        email: str = payload.get("sub")
+        if email is None:
             raise credentials_exception
     except JWTError:
         raise credentials_exception
         
-    # Fetch the actual user from MariaDB
-    user = db.query(models.User).filter(models.User.id == user_id).first()
+    # Mencari user di MariaDB berdasarkan email
+    user = db.query(models.User).filter(models.User.email == email).first()
     if user is None:
         raise credentials_exception
         
@@ -64,11 +67,8 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 
 def create_reset_token(data: dict):
     to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=15)
     
-    expires_delta = timedelta(minutes=15)
-    expire = datetime.utcnow() + expires_delta
-    
-    # Update the dictionary with expiration and scope
     to_encode.update({
         "exp": expire, 
         "scope": "password_reset" 
