@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 const Register = () => {
@@ -9,41 +9,97 @@ const Register = () => {
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  const [isClosing, setIsClosing] = useState(false); // If you are using the smooth error close here too
+  const [successMsg, setSuccessMsg] = useState(null); // <-- ADD THIS
+  
+    const handleCloseError = () => {
+    setIsClosing(true); 
+    setTimeout(() => {
+      setError(null);     
+      setIsClosing(false); 
+    }, 400); 
+  };
+
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        handleCloseError(); 
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
   const handleRegister = async (e) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
 
     try {
+      // 1. Prepare JSON payload (Make sure 'fullName' matches your state variable name!)
+      const payload = {
+        full_name: fullName, 
+        email: email,
+        password: password
+      };
+
+      // 2. Send as application/json
       const response = await fetch('http://127.0.0.1:8000/api/register', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json', // Critical difference from Login!
         },
-        body: JSON.stringify({
-          full_name: fullName,
-          email: email,
-          password: password
-        }),
+        body: JSON.stringify(payload),
       });
 
+      // 3. Smart Error Handling
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.detail || 'Registration failed. Please check your inputs.');
+        const errorData = await response.json();
+        let errorMessage = 'Registration failed. Please try again.';
+
+        // Safely extract the exact error message from FastAPI
+        if (errorData.detail) {
+          if (typeof errorData.detail === 'string') {
+            errorMessage = errorData.detail; // Handles our "Email already registered" 400 error
+          } else if (Array.isArray(errorData.detail)) {
+            errorMessage = errorData.detail[0].msg; // Handles Pydantic 422 Validation errors (like short passwords)
+          }
+        }
+        throw new Error(errorMessage);
       }
 
-      console.log("Account created successfully!");
-      navigate('/login');
-      
+      // 4. Success Logic
+      setSuccessMsg("Account created successfully! Redirecting...");
+      setTimeout(() => {
+        navigate('/login');
+      }, 9500);
+
     } catch (err) {
+      console.error("Registration Error:", err); // Helps debug in the F12 console
       setError(err.message);
-    } finally {
-      setIsLoading(false);
-    }
+      setIsLoading(false); // Guarantees the button ALWAYS resets
+    } 
   };
 
   return (
     <div className="auth-container">
+      {error && (
+        <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 bg-white border-l-4 border-[#e74c3c] px-6 py-4 shadow-2xl rounded-lg ${isClosing ? 'animate-toast-out' : 'animate-toast-in'}`}>
+          <span className="material-symbols-outlined text-[#e74c3c]">error</span>
+          <p className="text-sm font-bold text-[#1b263b]">{error}</p>
+          <button onClick={handleCloseError} className="ml-4 text-[#c5c6cd] hover:text-[#45474d] transition-colors bg-transparent border-none cursor-pointer">
+            <span className="material-symbols-outlined text-sm">close</span>
+          </button>
+        </div>
+      )}
+
+      {/* --- SUCCESS TOAST --- */}
+      {successMsg && (
+        <div className="fixed top-6 right-6 z-50 flex items-center gap-3 bg-white border-l-4 border-[#2ecc71] px-6 py-4 shadow-2xl rounded-lg animate-toast-in">
+          <span className="material-symbols-outlined text-[#2ecc71]">check_circle</span>
+          <p className="text-sm font-bold text-[#1b263b]">{successMsg}</p>
+        </div>
+      )}
+
       <div className="auth-left-panel order-2">
          <div className="absolute top-0 right-0 w-full h-full opacity-10">
           <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">

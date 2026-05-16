@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import ForgotPasswordModal from './ForgotPasswordModal';
 
@@ -12,6 +12,8 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const [successMsg, setSuccessMsg] = useState(null);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -39,17 +41,58 @@ const Login = () => {
       localStorage.setItem('spms_token', data.access_token);
       
       console.log("Authentication successful. Token secured.");
-      navigate('/');
+      setSuccessMsg("Login successful! Redirecting...");
+      
+      // Delay the redirect by 1.5 seconds to show the toast
+      setTimeout(() => {
+        navigate('/');
+      }, 1000);
       
     } catch (err) {
       setError(err.message);
-    } finally {
       setIsLoading(false);
     }
   };
 
+  const handleCloseError = () => {
+    setIsClosing(true); // 1. Trigger the slide-up animation
+    setTimeout(() => {
+      setError(null);     // 2. Actually remove it from the screen
+      setIsClosing(false); // 3. Reset for next time
+    }, 400); // 400ms matches our CSS animation duration
+  };
+
+  // Auto-dismiss the toast after 4 seconds
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        handleCloseError(); // <-- Update this line
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
   return (
     <div className="auth-container">
+      {/* --- TOAST NOTIFICATION --- */}
+      {error && (
+        <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 bg-white border-l-4 border-[#e74c3c] px-6 py-4 shadow-2xl rounded-lg ${isClosing ? 'animate-toast-out' : 'animate-toast-in'}`}>
+          <span className="material-symbols-outlined text-[#e74c3c]">error</span>
+          <p className="text-sm font-bold text-[#1b263b]">{error}</p>
+          <button 
+            onClick={handleCloseError} /* <-- Update this line */
+            className="ml-4 text-[#c5c6cd] hover:text-[#45474d] transition-colors bg-transparent border-none cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-sm">close</span>
+          </button>
+        </div>
+      )}
+      {successMsg && (
+        <div className="fixed top-6 right-6 z-50 flex items-center gap-3 bg-white border-l-4 border-[#2ecc71] px-6 py-4 shadow-2xl rounded-lg animate-toast-in">
+          <span className="material-symbols-outlined text-[#2ecc71]">check_circle</span>
+          <p className="text-sm font-bold text-[#1b263b]">{successMsg}</p>
+        </div>
+      )}
       <div className="auth-left-panel">
         <div className="absolute top-0 left-0 w-full h-full opacity-10">
           <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">

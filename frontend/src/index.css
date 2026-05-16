@@ -92,4 +92,23 @@ body {
   .alert-error-box {
     @apply p-3 bg-[#e74c3c]/10 border border-[#e74c3c]/20 text-[#e74c3c] text-xs font-bold rounded-lg flex items-center gap-2;
   }
+
+/* --- TOAST ANIMATIONS --- */
+@keyframes toast-slide-down {
+  0% { opacity: 0; transform: translateY(-1rem); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes toast-slide-up {
+  0% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-1rem); }
+}
+
+.animate-toast-in {
+  animation: toast-slide-down 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-toast-out {
+  animation: toast-slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
 }
