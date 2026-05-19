@@ -1,6 +1,21 @@
-import { Link } from 'react-router-dom';
+import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
 
 const Sidebar = () => {
+  const location = useLocation();
+
+  // Fungsi utilitas mengontrol active/highlight capsule secara dinamis & presisi
+  const getMenuClasses = (path) => {
+    const isActive = location.pathname === path || (path === '/app' && location.pathname === '/app/');
+    
+    // Base class asli tetap utuh agar tidak menggeser alignment teks menu
+    const baseClasses = "px-4 py-3 flex items-center gap-3 transition-all text-sm rounded-l-lg ml-2 font-medium";
+    
+    return isActive
+      ? `${baseClasses} bg-white dark:bg-[#051125] text-[#051125] dark:text-[#6bfe9c] font-bold shadow-sm`
+      : `${baseClasses} text-[#45474d] dark:text-[#c5c6cd] hover:bg-[#f1f4f3] dark:hover:bg-[#051125]/50`;
+  };
+
   return (
     <aside className="hidden md:flex flex-col h-screen w-64 border-r border-[#c5c6cd]/15 bg-[#ebeeed] dark:bg-[#1b263b] transition-all duration-200 ease-in-out">
       <div className="p-6">
@@ -15,28 +30,28 @@ const Sidebar = () => {
         </div>
         
         <nav className="space-y-1">
-          {/* UPDATED: to="/app" */}
-          <Link to="/app" className="bg-[#ffffff] dark:bg-[#051125] text-[#051125] dark:text-[#6bfe9c] font-bold rounded-l-lg ml-2 px-4 py-3 flex items-center gap-3 transition-all">
+          {/* Menu Dashboard */}
+          <Link to="/app" className={getMenuClasses('/app')}>
             <span className="material-symbols-outlined">dashboard</span>
-            <span className="text-sm font-medium">Dashboard</span>
+            <span>Dashboard</span>
           </Link>
           
-          {/* UPDATED: to="/app/alerts" */}
-          <Link to="/app/alerts" className="text-[#45474d] dark:text-[#c5c6cd] px-4 py-3 flex items-center gap-3 hover:bg-[#f1f4f3] dark:hover:bg-[#051125]/50 transition-all">
+          {/* Menu Alerts */}
+          <Link to="/app/alerts" className={getMenuClasses('/app/alerts')}>
             <span className="material-symbols-outlined">warning</span>
-            <span className="text-sm font-medium">Alerts</span>
+            <span>Alerts</span>
           </Link>
           
-          {/* UPDATED: to="/app/audit" */}
-          <Link to="/app/audit" className="text-[#45474d] dark:text-[#c5c6cd] px-4 py-3 flex items-center gap-3 hover:bg-[#f1f4f3] dark:hover:bg-[#051125]/50 transition-all">
+          {/* Menu Audit Logs (Memperbaiki teks hancur _HEART) */}
+          <Link to="/app/audit" className={getMenuClasses('/app/audit')}>
             <span className="material-symbols-outlined">security</span>
-            <span className="text-sm font-medium">Audit Logs</span>
+            <span>Audit Logs</span>
           </Link>
           
-          {/* UPDATED: to="/app/settings" */}
-          <Link to="/app/settings" className="text-[#45474d] dark:text-[#c5c6cd] px-4 py-3 flex items-center gap-3 hover:bg-[#f1f4f3] dark:hover:bg-[#051125]/50 transition-all">
+          {/* Menu Settings */}
+          <Link to="/app/settings" className={getMenuClasses('/app/settings')}>
             <span className="material-symbols-outlined">settings</span>
-            <span className="text-sm font-medium">Settings</span>
+            <span>Settings</span>
           </Link>
         </nav>
       </div>
@@ -46,14 +61,14 @@ const Sidebar = () => {
             Log Ticket
         </button>
         <div className="space-y-1">
-          {/* UPDATED: to="/app/support" */}
-          <Link to="/app/support" className="text-[#45474d] dark:text-[#c5c6cd] px-4 py-2 flex items-center gap-3 hover:bg-[#f1f4f3] dark:hover:bg-[#051125]/50 transition-all text-xs font-medium">
-            <span className="material-symbols-outlined text-sm">help</span> Support
+          <Link to="/app/support" className={getMenuClasses('/app/support') + " !py-2 text-xs"}>
+            <span className="material-symbols-outlined text-sm">help</span> 
+            <span>Support</span>
           </Link>
           
-          {/* UPDATED: to="/app/status" */}
-          <Link to="/app/status" className="text-[#45474d] dark:text-[#c5c6cd] px-4 py-2 flex items-center gap-3 hover:bg-[#f1f4f3] dark:hover:bg-[#051125]/50 transition-all text-xs font-medium">
-            <span className="material-symbols-outlined text-sm">analytics</span> System Status
+          <Link to="/app/status" className={getMenuClasses('/app/status') + " !py-2 text-xs"}>
+            <span className="material-symbols-outlined text-sm">analytics</span> 
+            <span>System Status</span>
           </Link>
         </div>
       </div>

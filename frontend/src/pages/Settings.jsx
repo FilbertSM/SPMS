@@ -1,110 +1,330 @@
-const Dashboard = () => {
-  return (
-    <div className="page-container bg-[#f1f4f3]">
-      {/* Header Section: Status and Identity */}
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="panel-card lg:col-span-2 flex flex-col justify-between relative overflow-hidden">
-          <div className="relative z-10">
-            <h2 className="heading-primary mb-2">PMA Granulator #01</h2>
-            <p className="text-subtitle max-w-lg leading-relaxed">
-              System monitoring the wet granulation process. Real-time predictive maintenance enabled via LSTM neural network models.
-            </p>
-          </div>
-          <div className="mt-8 flex gap-4 z-10">
-            <button className="btn-primary w-auto py-3 px-6 mt-0 bg-gradient-to-br from-[#051125] to-[#1b263b]">
-              <span className="material-symbols-outlined text-sm">history</span>
-              View Historical Data
-            </button>
-            <button className="btn-secondary py-3 px-6 bg-[#e6e9e8]">
-              <span className="material-symbols-outlined text-sm">medical_services</span>
-              Log Maintenance Ticket
-            </button>
-          </div>
-          {/* Decorative SVG */}
-          <div className="absolute top-0 right-0 w-64 h-full opacity-5 pointer-events-none">
-            <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-              <path d="M44.7,-76.4C58.1,-69.2,69.2,-58.1,77.3,-44.7C85.4,-31.3,90.5,-15.7,89.3,-0.7C88.1,14.3,80.7,28.6,71.5,41.2C62.3,53.8,51.3,64.7,38.1,72.4C24.9,80.1,9.4,84.6,-5.6,83.1C-20.6,81.6,-35.1,74.1,-47.3,64.8C-59.5,55.5,-69.4,44.4,-76.1,31.5C-82.8,18.6,-86.3,3.9,-84.4,-10.1C-82.5,-24.1,-75.2,-37.4,-65.4,-48.5C-55.6,-59.6,-43.3,-68.5,-30.2,-75.4C-17.1,-82.3,-3.2,-87.2,11.2,-86.3C25.6,-85.4,44.7,-76.4,44.7,-76.4Z" fill="#051125" transform="translate(140 100)"></path>
-            </svg>
-          </div>
-        </div>
+import React from "react";
 
-        {/* Status Box */}
-        <div className="panel-card bg-[#6bfe9c] border-none flex flex-col items-center justify-center text-center space-y-4 shadow-md">
-          <div className="w-20 h-20 rounded-full bg-white/30 flex items-center justify-center animate-pulse">
-            <span className="material-symbols-outlined text-[#00743a] text-4xl" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+/**
+ * Settings Component (Hanya Area Halaman Utama)
+ * Sudah disesuaikan dengan utilitas class dari index.css & DESIGN.md
+ */
+export default function Settings() {
+  return (
+    <div className="page-container">
+      
+      {/* Page Header */}
+      <div className="mb-10 flex justify-between items-end">
+        <div>
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#45474d] block mb-2 font-label">
+            Configuration Environment
+          </span>
+          <h1 className="heading-primary">
+            System Settings & Configuration
+          </h1>
+        </div>
+        <div className="flex gap-3">
+          <button className="px-5 py-2.5 rounded-md text-sm font-bold text-[#45474d] hover:bg-[#e6e9e8] transition-colors">
+            Discard Changes
+          </button>
+          {/* Menggunakan skema warna primary #1B263B sesuai DESIGN.md */}
+          <button className="px-6 py-2.5 rounded-md text-sm font-bold text-white bg-[#1b263b] hover:bg-[#051125] shadow-lg active:scale-[0.98] transition-all font-label uppercase tracking-widest">
+            Save Global Config
+          </button>
+        </div>
+      </div>
+
+      {/* Bento Grid Layout */}
+      <div className="grid grid-cols-12 gap-6">
+        
+        {/* 1. ML Threshold Configuration (Wide Card) */}
+        <section className="panel-card col-span-12 lg:col-span-8">
+          <div className="flex items-center gap-3 mb-8">
+            <span className="material-symbols-outlined text-[#1b263b] bg-[#f1f4f3] p-2 rounded-lg">
+              psychology
+            </span>
+            <div>
+              <h3 className="heading-secondary">ML Threshold Configuration</h3>
+              <p className="text-subtitle font-medium">
+                Define Mean Squared Error (MSE) anomaly detection parameters.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-10">
+            {/* Critical Threshold */}
+            <div className="group">
+              <div className="flex justify-between items-end mb-4">
+                <div>
+                  {/* Menggunakan aksen warna tersier #E74C3C untuk keadaan error/critical */}
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-[#e74c3c] font-label">
+                    Critical Alert Threshold
+                  </label>
+                  <p className="text-subtitle">
+                    Triggers immediate machine shutdown and tech dispatch.
+                  </p>
+                </div>
+                <span className="text-2xl font-black text-[#051125] font-headline">
+                  0.35 <span className="text-[10px] text-[#45474d] font-normal tracking-normal">MSE</span>
+                </span>
+              </div>
+              <input 
+                className="w-full h-1.5 bg-[#e0e3e2] rounded-full appearance-none cursor-pointer accent-[#e74c3c]" 
+                max="1" 
+                min="0" 
+                step="0.01" 
+                type="range" 
+                defaultValue="0.35" 
+              />
+            </div>
+
+            {/* Warning Threshold */}
+            <div className="group">
+              <div className="flex justify-between items-end mb-4">
+                <div>
+                  {/* Menggunakan aksen sekunder #2ECC71 untuk warning/aman */}
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-[#006d37] font-label">
+                    Warning Threshold
+                  </label>
+                  <p className="text-subtitle">
+                    Flags maintenance request in dashboard without interruption.
+                  </p>
+                </div>
+                <span className="text-2xl font-black text-[#051125] font-headline">
+                  0.15 <span className="text-[10px] text-[#45474d] font-normal tracking-normal">MSE</span>
+                </span>
+              </div>
+              <input 
+                className="w-full h-1.5 bg-[#e0e3e2] rounded-full appearance-none cursor-pointer accent-[#2ecc71]" 
+                max="1" 
+                min="0" 
+                step="0.01" 
+                type="range" 
+                defaultValue="0.15" 
+              />
+            </div>
+
+            {/* Consecutive Breach Duration */}
+            <div className="pt-6 border-t border-[#c5c6cd]/20 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <span className="material-symbols-outlined text-[#45474d]">timer</span>
+                <div>
+                  <label className="form-label">
+                    Consecutive Breach Duration
+                  </label>
+                  <p className="text-xs text-[#45474d]">Wait time before triggering alert state</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input 
+                  className="w-20 bg-[#f1f4f3] border-0 border-b-2 border-[#c5c6cd]/50 focus:ring-0 focus:border-[#1b263b] text-right font-bold text-[#1b263b] rounded-t-md" 
+                  type="number" 
+                  defaultValue="5" 
+                />
+                <span className="text-xs font-bold text-[#45474d] font-label">MINS</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 5. Maintenance Mode Toggle (Side Card) */}
+        {/* Menggunakan warna dasar putih/panel-card agar tulisan teks gelap tidak pudar atau hilang */}
+        <section className="panel-card col-span-12 lg:col-span-4 flex flex-col justify-between overflow-hidden relative border-t-4 border-t-[#1b263b]">
+          <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
+            <span className="material-symbols-outlined text-8xl text-[#1b263b]">construction</span>
           </div>
           <div>
-            <span className="text-[0.6875rem] font-bold font-label uppercase tracking-widest text-[#00743a]/70">Current Machine Status</span>
-            <h3 className="text-5xl font-extrabold font-headline text-[#00743a] tracking-tighter mt-1">HEALTHY</h3>
+            <h3 className="heading-secondary mb-2">Maintenance Mode</h3>
+            <p className="text-subtitle leading-relaxed mb-6">
+              Pause AI inference and monitoring during planned repairs to prevent false positives.
+            </p>
           </div>
-          <div className="flex items-center gap-2 bg-[#00743a]/10 px-4 py-1.5 rounded-full">
-            <span className="w-2 h-2 bg-[#00743a] rounded-full"></span>
-            <span className="text-[10px] font-bold uppercase text-[#00743a]">98.4% Efficiency</span>
+          <div className="flex items-center justify-between bg-[#f1f4f3] p-4 rounded-lg border border-[#c5c6cd]/20">
+            <span className="text-xs font-bold tracking-tight text-[#1b263b] font-label">AI INFERENCE ENGINE</span>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input className="sr-only peer" type="checkbox" />
+              <div className="w-14 h-7 bg-[#e0e3e2] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-1 after:left-1 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#2ecc71]"></div>
+            </label>
           </div>
-        </div>
-      </section>
+          <div className="mt-4 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-[#2ecc71] animate-pulse"></span>
+            <span className="text-[10px] uppercase font-black tracking-widest text-[#2ecc71] font-label">
+              Operational
+            </span>
+          </div>
+        </section>
 
-      {/* Telemetry & Insights Section */}
-      <section className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Main Chart */}
-        <div className="panel-card lg:col-span-8 p-6">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h4 className="heading-secondary text-lg flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#051125]">electric_bolt</span>
-                Motor Current vs LSTM Prediction
-              </h4>
-              <p className="text-subtitle text-xs mt-1">Predictive analysis of motor load behavior</p>
+        {/* 2. Notification Rules */}
+        <section className="panel-card col-span-12 lg:col-span-5">
+          <div className="flex items-center gap-3 mb-8">
+            <span className="material-symbols-outlined text-[#1b263b] bg-[#f1f4f3] p-2 rounded-lg">
+              mail
+            </span>
+            <h3 className="heading-secondary">Notification Rules</h3>
+          </div>
+          
+          <div className="space-y-6">
+            <div className="flex items-center justify-between py-2 border-b border-[#c5c6cd]/10">
+              <div>
+                <p className="text-[13px] font-bold text-[#1b263b]">Critical Status Alerts</p>
+                <p className="text-[11px] text-[#45474d]">SMS + Push Notification</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input defaultChecked className="sr-only peer" type="checkbox" />
+                <div className="w-11 h-6 bg-[#e0e3e2] rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-1 after:left-1 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#1b263b]"></div>
+              </label>
             </div>
-            <div className="flex items-center gap-4 text-[10px] font-bold font-headline uppercase tracking-widest">
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-0.5 bg-[#1B263B]"></span>
-                <span className="text-[#051125]">Actual</span>
+            
+            <div className="flex items-center justify-between py-2 border-b border-[#c5c6cd]/10">
+              <div>
+                <p className="text-[13px] font-bold text-[#1b263b]">Warning Notifications</p>
+                <p className="text-[11px] text-[#45474d]">Email only</p>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-0.5 border-t border-dashed border-slate-500"></span>
-                <span className="text-[#45474d]">Expected</span>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input defaultChecked className="sr-only peer" type="checkbox" />
+                <div className="w-11 h-6 bg-[#e0e3e2] rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-1 after:left-1 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#1b263b]"></div>
+              </label>
+            </div>
+            
+            <div className="flex items-center justify-between py-2 border-b border-[#c5c6cd]/10">
+              <div>
+                <p className="text-[13px] font-bold text-[#1b263b]">Sensor Offline Event</p>
+                <p className="text-[11px] text-[#45474d]">SMS for immediate action</p>
               </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input className="sr-only peer" type="checkbox" />
+                <div className="w-11 h-6 bg-[#e0e3e2] rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-1 after:left-1 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#1b263b]"></div>
+              </label>
+            </div>
+            
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <p className="text-[13px] font-bold text-[#1b263b]">Weekly Summary Reports</p>
+                <p className="text-[11px] text-[#45474d]">Automated PDF analytics</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input defaultChecked className="sr-only peer" type="checkbox" />
+                <div className="w-11 h-6 bg-[#e0e3e2] rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-1 after:left-1 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#1b263b]"></div>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        {/* 3. User Access Management */}
+        <section className="panel-card col-span-12 lg:col-span-7">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-[#1b263b] bg-[#f1f4f3] p-2 rounded-lg">
+                group
+              </span>
+              <h3 className="heading-secondary">User Access Management</h3>
+            </div>
+            <button className="text-[11px] font-bold uppercase tracking-widest text-[#1b263b] flex items-center gap-1 hover:underline font-label">
+              <span className="material-symbols-outlined text-sm">add</span> Add Personnel
+            </button>
+          </div>
+
+          <div className="overflow-hidden">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-[#c5c6cd]/30">
+                  <th className="pb-3 text-[10px] font-bold text-[#45474d] uppercase tracking-widest font-label">Personnel</th>
+                  <th className="pb-3 text-[10px] font-bold text-[#45474d] uppercase tracking-widest text-center font-label">Role</th>
+                  <th className="pb-3 text-[10px] font-bold text-[#45474d] uppercase tracking-widest text-right font-label">Last Login</th>
+                  <th className="pb-3 text-[10px] font-bold text-[#45474d] uppercase tracking-widest text-right font-label">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#c5c6cd]/10">
+                <tr>
+                  <td className="py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded bg-[#f1f4f3] flex items-center justify-center font-bold text-xs text-[#1b263b]">AW</div>
+                      <div>
+                        <p className="text-sm font-bold text-[#1b263b]">Agus Wijaya</p>
+                        <p className="text-[11px] text-[#45474d] font-label">ID: 1024</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-4 text-center">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#1b263b]/5 text-[#1b263b] uppercase font-label">Admin</span>
+                  </td>
+                  <td className="py-4 text-right text-[12px] text-[#45474d] font-medium">Today, 08:42 AM</td>
+                  <td className="py-4 text-right">
+                    <button className="material-symbols-outlined text-[#45474d] hover:text-[#1b263b]">more_vert</button>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded bg-[#f1f4f3] flex items-center justify-center font-bold text-xs text-[#1b263b]">SD</div>
+                      <div>
+                        <p className="text-sm font-bold text-[#1b263b]">Siti Dewi</p>
+                        <p className="text-[11px] text-[#45474d] font-label">ID: 2944</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-4 text-center">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#2ecc71]/10 text-[#006d37] uppercase font-label">Technician</span>
+                  </td>
+                  <td className="py-4 text-right text-[12px] text-[#45474d] font-medium">Yesterday, 04:15 PM</td>
+                  <td className="py-4 text-right">
+                    <button className="material-symbols-outlined text-[#45474d] hover:text-[#1b263b]">more_vert</button>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded bg-[#f1f4f3] flex items-center justify-center font-bold text-xs text-[#1b263b]">BP</div>
+                      <div>
+                        <p className="text-sm font-bold text-[#1b263b]">Budi Prasetyo</p>
+                        <p className="text-[11px] text-[#45474d] font-label">ID: 3310</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-4 text-center">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#2ecc71]/10 text-[#006d37] uppercase font-label">Technician</span>
+                  </td>
+                  <td className="py-4 text-right text-[12px] text-[#45474d] font-medium">3 days ago</td>
+                  <td className="py-4 text-right">
+                    <button className="material-symbols-outlined text-[#45474d] hover:text-[#1b263b]">more_vert</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* 4. Data Retention & Security */}
+        <section className="panel-card col-span-12 flex flex-wrap gap-8 items-center justify-between border-l-4 border-l-[#1b263b]">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-[#1b263b]">security</span>
+              <div>
+                <h3 className="text-lg font-bold text-[#1b263b] font-headline">Security & Retention</h3>
+                <p className="text-xs text-[#45474d]">Global data governance parameters</p>
+              </div>
+            </div>
+            <div className="h-10 w-px bg-[#c5c6cd]/40"></div>
+            <div className="flex items-center gap-4">
+              <label className="text-[11px] font-black uppercase tracking-widest text-[#45474d] font-label">
+                Audit Log Retention
+              </label>
+              <select defaultValue="180 Days" className="bg-white border border-[#c5c6cd]/40 rounded px-4 py-1.5 text-xs font-bold text-[#1b263b] focus:ring-2 focus:ring-[#1b263b]/20 font-label outline-none">
+                <option>90 Days</option>
+                <option>180 Days</option>
+                <option>365 Days</option>
+                <option>Indefinite</option>
+              </select>
             </div>
           </div>
           
-          <div className="relative h-64 w-full px-2">
-            {/* Chart SVG Area */}
-            <div className="ml-8 h-full relative">
-              <div className="absolute top-[15%] w-full border-t border-[#ba1a1a]/60 border-dashed z-10 flex justify-end">
-                <span className="text-[8px] font-headline font-bold text-[#ba1a1a] bg-[#ffffff] px-1 -mt-2">Threshold: 8.5A</span>
-              </div>
-              <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none" viewBox="0 0 1000 100">
-                <path d="M 0,40 L 50,42 L 100,38 L 150,45 L 200,41 L 250,55 L 300,65 L 350,58 L 400,62 L 450,55 L 500,60 L 550,52 L 600,68 L 650,59 L 700,63 L 750,55 L 800,67 L 850,58 L 900,62 L 950,56 L 1000,60 L 1000,70 L 950,68 L 900,75 L 850,65 L 800,78 L 750,68 L 700,72 L 650,70 L 600,82 L 550,65 L 500,75 L 450,68 L 400,74 L 350,70 L 300,80 L 250,70 L 200,55 L 150,58 L 100,52 L 50,55 L 0,53 Z" fill="rgba(100, 116, 139, 0.1)"></path>
-                <polyline fill="none" points="0,40 50,42 100,38 150,45 200,41 250,55 300,65 350,58 400,62 450,55 500,60 550,52 600,68 650,59 700,63 750,55 800,67 850,58 900,62 950,56 1000,60" stroke="#1B263B" strokeWidth="2"></polyline>
-                <polyline fill="none" points="0,53 50,55 100,52 150,58 200,55 250,70 300,80 350,70 400,74 450,68 500,75 550,65 600,82 650,70 700,72 750,68 800,78 850,65 900,75 950,68 1000,70" stroke="#64748b" strokeDasharray="4,2" strokeWidth="1.5"></polyline>
-              </svg>
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <p className="text-[10px] font-bold uppercase text-[#45474d] leading-none mb-1 font-label">Last Rotation</p>
+              <p className="text-xs font-medium text-[#1b263b]">24 Oct 2023</p>
             </div>
+            <button className="px-5 py-2.5 bg-white text-[#1b263b] text-[11px] font-bold uppercase tracking-widest border border-[#c5c6cd]/40 hover:bg-[#f1f4f3] hover:shadow-md transition-all flex items-center gap-2 font-label rounded-md">
+              <span className="material-symbols-outlined text-base">key</span> Rotate Cryptographic Keys
+            </button>
           </div>
-        </div>
+        </section>
 
-        {/* Anomaly Score Gauge */}
-        <div className="panel-card lg:col-span-4 p-6 flex flex-col">
-          <h4 className="heading-secondary text-lg flex items-center gap-2 mb-6">
-            <span className="material-symbols-outlined text-[#1b263b]">psychology</span>
-            Anomaly Score (MSE)
-          </h4>
-          <div className="flex-1 flex flex-col items-center justify-center">
-            <div className="relative w-48 h-48 flex items-center justify-center">
-              <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
-                <circle className="text-[#e0e3e2]" cx="50" cy="50" fill="transparent" r="40" stroke="currentColor" strokeWidth="8"></circle>
-                <circle className="text-[#006d37]" cx="50" cy="50" fill="transparent" r="40" stroke="currentColor" strokeDasharray="251.2" strokeDashoffset="240" strokeLinecap="round" strokeWidth="8"></circle>
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-4xl font-extrabold font-headline text-[#051125]">0.042</span>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-[#45474d]">Nominal</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      </div>
     </div>
   );
-};
-
-export default Dashboard;
+}
