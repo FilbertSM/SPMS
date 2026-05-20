@@ -23,6 +23,6 @@ class AuditLog(Base):
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
     user_email = Column(String(255), nullable=True)    
     action = Column(String(255), nullable=False)
-    status = Column(String(50), nullable=True) # Mencatat SUCCESS atau FAILED
+    status = Column(String(50), nullable=True) 
     ip_address = Column(String(45), nullable=True)
     browser_info = Column(String(500), nullable=True)

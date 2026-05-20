@@ -1,55 +1,25 @@
+import re
 from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
-from fastapi.security import OAuth2PasswordRequestForm
-from contextlib import asynccontextmanager
-from jose import jwt
-from pydantic import BaseModel
-from typing import List
-from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
-
-# --- SECURITY LIBRARIES (Cyber Security Layer) ---
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-
-# --- APP IMPORTS ---
 from app.core.config import settings
-from app import schemas
+from app import models, schemas, database
+from sqlalchemy.orm import Session
 from app.core import security
+from fastapi.security import OAuth2PasswordRequestForm
+from contextlib import asynccontextmanager 
+from app.core.security import create_reset_token 
+from app.utils.email import send_reset_email 
+from pydantic import BaseModel
+from jose import jwt, JWTError
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
+from fastapi.security import OAuth2PasswordBearer
+from app.core.security import SECRET_KEY, ALGORITHM
+
+# Import database engine and models
 from app.database.database import engine, SessionLocal
 from app.database import models
 
-# 1. Inisialisasi Rate Limiter (🛡️ Mencegah Brute Force)
-limiter = Limiter(key_func=get_remote_address)
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    print("🛡️ SPMS Backend: Cyber Security Shield Activated")
-    models.Base.metadata.create_all(bind=engine)
-    yield
-    print("🛑 SPMS Backend: Shutting down...")
-
-# 2. Fungsi Helper untuk Audit Log (🛡️ Mencatat Jejak Aktivitas)
-def create_audit_entry(db: Session, email: str, action: str, request: Request, status: str):
-    new_log = models.AuditLog(
-        user_email=email,
-        action=action,
-        status=status,
-        ip_address=request.client.host,
-        browser_info=request.headers.get("user-agent")
-    )
-    db.add(new_log)
-    db.commit()
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-# Konfigurasi Email
+# --- CONFIGURATION EMAIL ---
 conf = ConnectionConfig(
     MAIL_USERNAME = "jason_a@smaknasionalanglo.sch.id",
     MAIL_PASSWORD = "dpxfvzcuqlvncbmv",
@@ -62,113 +32,239 @@ conf = ConnectionConfig(
     VALIDATE_CERTS = True
 )
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("🛡️ Starting up SPMS Backend... Cyber Security Shield Activated")
+    yield
+    print("🛑 Shutting down SPMS Backend...")
+
 def get_application() -> FastAPI:
+    # Build tables before starting the app
+    models.Base.metadata.create_all(bind=engine)
+
     _app = FastAPI(
-        title="SPMS API - Secured Version",
-        lifespan=lifespan
+        title=settings.PROJECT_NAME,
+        openapi_url=f"{settings.API_V1_STR}/openapi.json",
+        description="Secure Predictive Maintenance System API",
+        version="1.0.0"
     )
-    _app.state.limiter = limiter
-    _app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+    origins = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
 
     _app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=origins,  
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
     return _app
 
 app = get_application()
 
 @app.get("/")
 def health_check():
-    return {"status": "online", "security_layer": "active"}
+    return {
+        "status": "online",
+        "service": settings.PROJECT_NAME,
+        "message": "SPMS API is ready for telemetry."
+    }
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 # --- AUTHENTICATION ENDPOINTS ---
 
-@app.post("/api/register", response_model=schemas.UserResponse)
+@app.post("/api/register", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
 def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    # 1. Check for existing email
     existing_user = db.query(models.User).filter(models.User.email == user.email).first()
     if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Email already registered"
+        )
     
+    # 2. 🛡️ STRICT BACKEND VALIDATION (Sinkron dengan Register.jsx kamu)
+    # A. Validasi Domain Resmi Perusahaan
+    ALLOWED_DOMAINS = ['sakafarma.com', 'president.ac.id', 'student.president.ac.id']
+    email_domain = user.email.split('@')[-1].lower() if '@' in user.email else ''
+    if email_domain not in ALLOWED_DOMAINS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Registration is restricted to official company domains only."
+        )
+
+    # B. Validasi Kompleksitas Password Satu Kalimat Padat
+    has_uppercase = re.search(r"[A-Z]", user.password)
+    has_number = re.search(r"[0-9]", user.password)
+    has_symbol = re.search(r"[^A-Za-z0-9]", user.password)
+    
+    if len(user.password) < 8 or len(user.password) > 20 or not has_uppercase or not has_number or not has_symbol:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters long and contain uppercase letters, numbers, and symbols."
+        )
+    
+    print(f"--- DEBUG: Security validation passed for user: {user.email} ---")
+    
+    # 3. Hash password
     hashed_pw = security.get_password_hash(user.password)
+    
+    # 4. Create the new user object
     new_user = models.User(
-        full_name=user.full_name,
+        full_name=user.full_name,  
         email=user.email,
         hashed_password=hashed_pw
     )
+    
+    # 5. Save database
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    
     return new_user
 
+
 @app.post("/api/login", response_model=schemas.Token)
-@limiter.limit("5/minute")
-def login(request: Request, user_credentials: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login(user_credentials: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == user_credentials.username).first()
     
     if not user or not security.verify_password(user_credentials.password, user.hashed_password):
-        create_audit_entry(db, user_credentials.username, "LOGIN_ATTEMPT", request, "FAILED")
-        raise HTTPException(status_code=401, detail="Invalid Credentials")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Invalid Credentials",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
         
-    create_audit_entry(db, user.email, "LOGIN_SUCCESS", request, "SUCCESS")
-    access_token = security.create_access_token(data={"sub": user.email, "role": user.role})
+    access_token = security.create_access_token(
+        data={"user_id": user.id, "role": user.role}
+    )
+    
     return {"access_token": access_token, "token_type": "bearer"}
 
-# --- CYBER SECURITY ENDPOINTS ---
 
-@app.get("/api/audit-logs")
-def get_audit_logs(db: Session = Depends(get_db), current_user: models.User = Depends(security.get_current_user)):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Akses ditolak: Anda bukan Admin")
-    
-    logs = db.query(models.AuditLog).order_by(models.AuditLog.timestamp.desc()).limit(100).all()
-    return logs
+class EmailSchema(BaseModel):
+    email: str
 
-# --- PASSWORD RESET LOGIC ---
 
+# 👇 FIXED: Ditambahkan /api agar sinkron dengan Fetch di ForgotPassword.jsx 👇
 @app.post("/api/forgot-password")
 async def forgot_password(request: schemas.ForgotPasswordRequest, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.email == request.email).first()
+    # Pastikan email dicari dengan huruf kecil (lowercase) agar konsisten
+    user = db.query(models.User).filter(models.User.email == request.email.strip()).first()
     
     if user:
-        reset_token = security.create_access_token(
-            data={"sub": user.email, "scope": "password_reset"},
-            expires_delta=15
-        )
+        # Menggunakan fungsi pembuatan token bawaan security.py
+        reset_token = security.create_reset_token(data={"sub": user.email})
         reset_link = f"http://localhost:5173/reset-password?token={reset_token}"
         
+        # Format HTML Email
         message = MessageSchema(
-            subject="SPMS Password Reset",
+            subject="SPMS - Password Reset Request",
             recipients=[user.email],
-            body=f"Klik link berikut untuk reset password: {reset_link}",
+            body=f"""
+            <div style="font-family: Arial, sans-serif; max-width: 500px; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px; color: #1b263b;">
+                <h3 style="font-size: 20px; font-weight: bold; margin-bottom: 8px;">Reset Your SPMS Password</h3>
+                <p style="font-size: 14px; color: #45474d; margin-bottom: 16px;">You requested a password reset for your account.</p>
+                <p style="font-size: 14px; color: #45474d; margin-bottom: 24px;">Click the button below to set a new password. This link expires in 15 minutes.</p>
+                <a href="{reset_link}" style="display: inline-block; padding: 12px 24px; background-color: #1b263b; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; text-transform: uppercase;">Reset Password</a>
+                <p style="font-size: 11px; color: #777; margin-top: 28px; line-height: 1.5;">
+                    If the button above doesn't work, copy and paste this URL into your browser:<br>
+                    <a href="{reset_link}" style="color: #2ecc71;">{reset_link}</a>
+                </p>
+            </div>
+            """,
             subtype=MessageType.html
         )
-        fm = FastMail(conf)
+
+        # 👇 PERBAIKAN UTAMA: Tambahkan parameter config= 👇
+        fm = FastMail(config=conf)
         await fm.send_message(message)
+        print(f"--- SUCCESS: Email reset password berhasil dikirim ke {user.email} ---")
+    else:
+        # Debugging log di terminal lokal kamu untuk tahu kalau email tidak ditemukan di DB
+        print(f"--- WARNING: Seseorang meminta reset untuk email {request.email}, tapi TIDAK TERDAFTAR di database ---")
         
-    return {"message": "Jika email terdaftar, instruksi reset telah dikirim."}
+    return {"message": "If this email is registered, a reset link has been sent."}
+
+
+class ResetPassword(BaseModel):
+    token: str
+    new_password: str
 
 @app.post("/api/reset-password")
 def reset_password(data: schemas.ResetPassword, db: Session = Depends(get_db)):
     try:
-        payload = jwt.decode(data.token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
-        email: str = payload.get("sub")
-        if payload.get("scope") != "password_reset":
-            raise HTTPException(status_code=401, detail="Token tidak valid")
+        unverified_payload = jwt.get_unverified_claims(data.token)
+        email: str = unverified_payload.get("sub")
+        
+        if not email:
+            raise HTTPException(status_code=401, detail="Token expired or invalid")
+            
     except jwt.JWTError:
-        raise HTTPException(status_code=401, detail="Token kedaluwarsa")
+        raise HTTPException(status_code=401, detail="Token expired or invalid")
 
     user = db.query(models.User).filter(models.User.email == email).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User tidak ditemukan")
-
+            raise HTTPException(status_code=404, detail="User not found")
+        
     user.hashed_password = security.get_password_hash(data.new_password)
     db.commit()
-    return {"message": "Password berhasil diperbarui"}
+
+    return {"message": "Password updated successfully. You can now login."}
+
+# --- ACCESS CONTROL HELPER ---
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        token_user_id = payload.get("user_id")
+        
+        if token_user_id is None:
+            raise credentials_exception
+            
+    except JWTError:
+        raise credentials_exception
+        
+    user = db.query(models.User).filter(models.User.id == token_user_id).first()
+    
+    if user is None:
+        raise credentials_exception
+        
+    return user
+
 
 @app.get("/api/users/me", response_model=schemas.UserResponse)
-def read_users_me(current_user: models.User = Depends(security.get_current_user)):
+def read_users_me(current_user: models.User = Depends(get_current_user)):
     return current_user
+
+@app.patch("/api/users/me/preferences")
+def update_user_preferences(
+    preferences: schemas.UserPreferencesUpdate, 
+    current_user: models.User = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    current_user.email_notifications = preferences.email_notifications
+    db.commit()
+    return {"message": "Preferences updated successfully", "email_notifications": current_user.email_notifications}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
