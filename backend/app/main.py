@@ -179,7 +179,6 @@ async def forgot_password(request: schemas.ForgotPasswordRequest, db: Session = 
         # Create the email content
         message = MessageSchema(
             subject="SPMS - Password Reset Request",
-            subject="SPMS - Password Reset Request",
             recipients=[user.email],
             body=f"""
             <h3>Reset Your SPMS Password</h3>
@@ -199,9 +198,7 @@ async def forgot_password(request: schemas.ForgotPasswordRequest, db: Session = 
     return {"message": "If this email is registered, a reset link has been sent."}
 
 
-class ResetPassword(BaseModel):
-    token: str
-    new_password: str
+
     return {"message": "If this email is registered, a reset link has been sent."}
 
 
@@ -275,7 +272,6 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 
 # Make sure this route exists so React has somewhere to go!
 @app.get("/api/users/me", response_model=schemas.UserResponse)
-def read_users_me(current_user: models.User = Depends(get_current_user)):
 def read_users_me(current_user: models.User = Depends(get_current_user)):
     return current_user
 
