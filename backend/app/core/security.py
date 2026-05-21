@@ -1,3 +1,4 @@
+from typing import Optional, Union
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -32,15 +33,25 @@ def verify_password(plain_password, hashed_password):
 def get_password_hash(password):
     return pwd_context.hash(password)
 
-def create_access_token(data: dict):
+# 👇 INI FUNGSI YANG SUDAH KITA UPDATE 👇
+def create_access_token(data: dict, expires_delta: Optional[Union[timedelta, int]] = None):
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    
+    if expires_delta:
+        if isinstance(expires_delta, int):
+            expire = datetime.utcnow() + timedelta(minutes=expires_delta)
+        else:
+            expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        
     to_encode.update({"exp": expire})
     
     # Menghasilkan token JWT
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
+# 👇 FUNGSI INI TELAH DIPERBAIKI AGAR SESUAI DENGAN PAYLOAD LOGIN 👇
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -51,15 +62,18 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         # Mendekode token untuk mengambil identitas user
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         
-        # 🛡️ UPDATE: Mengambil 'sub' (email) sesuai dengan yang dikirim main.py
-        email: str = payload.get("sub")
-        if email is None:
+        # 🛡️ FIX: Mengambil 'user_id' karena login route mengirimkan 'user_id', bukan 'sub'
+        token_user_id = payload.get("user_id")
+        
+        if token_user_id is None:
             raise credentials_exception
+            
     except JWTError:
         raise credentials_exception
         
-    # Mencari user di MariaDB berdasarkan email
-    user = db.query(models.User).filter(models.User.email == email).first()
+    # Mencari user di MariaDB berdasarkan ID (Lebih cepat daripada mencari via string email)
+    user = db.query(models.User).filter(models.User.id == token_user_id).first()
+    
     if user is None:
         raise credentials_exception
         

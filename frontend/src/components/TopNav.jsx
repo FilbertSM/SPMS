@@ -106,7 +106,7 @@ const TopNav = () => {
             <div className="absolute right-0 mt-4 w-48 bg-white dark:bg-[#051125] rounded-xl shadow-xl border border-[#c5c6cd]/20 overflow-hidden z-50 transform origin-top-right transition-all">
               <div className="py-1">
                 <button 
-                  onClick={() => setIsDropdownOpen(false)}
+                  onClick={() => {setIsDropdownOpen(false); navigate('/profile');}}
                   className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#051125] dark:text-[#f1f4f3] hover:bg-[#ebeeed] dark:hover:bg-[#1b263b] flex items-center gap-3 transition-colors"
                 >
                   <span className="material-symbols-outlined text-[18px] text-[#45474d]">person</span>

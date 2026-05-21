@@ -8,6 +8,9 @@ import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
 import ProtectedRoute from './components/Routes'; 
 import ForgotPassword from './pages/ForgotPassword';
+import Profile from './pages/Profile';
+import PmaDashboard from './pages/PMAChart';
+import MotorChart from './pages/VibrationChart';
 
 // Import halaman baru yang tadi kita buat
 import AuditLogs from './pages/AuditLogs';
@@ -24,6 +27,9 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/pma-dashboard" element={<PmaDashboard />} />
+        <Route path="/vibration-chart" element={<MotorChart />} />
 
         {/* Internal Routes - PROTECTED */}
         <Route 

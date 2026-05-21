@@ -25,3 +25,6 @@ class ResetPassword(BaseModel):
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
+
+class UserPreferencesUpdate(BaseModel):
+    email_notifications: bool

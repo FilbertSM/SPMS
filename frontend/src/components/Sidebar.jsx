@@ -35,6 +35,18 @@ const Sidebar = () => {
             <span className="material-symbols-outlined">dashboard</span>
             <span>Dashboard</span>
           </Link>
+
+          {/* Menu PMA */}
+          <Link to="/pma-dashboard" className={getMenuClasses('/pma-dashboard')}>
+            <span className="material-symbols-outlined">trending_up</span>
+            <span>PMA</span>
+          </Link>
+
+          {/* Menu Vibration */}
+          <Link to="/vibration-chart" className={getMenuClasses('/vibration-dashboard')}>
+            <span className="material-symbols-outlined">trending_up</span>
+            <span>Vibration</span>
+          </Link>
           
           {/* Menu Alerts */}
           <Link to="/app/alerts" className={getMenuClasses('/app/alerts')}>
@@ -53,6 +65,8 @@ const Sidebar = () => {
             <span className="material-symbols-outlined">settings</span>
             <span>Settings</span>
           </Link>
+
+
         </nav>
       </div>
 
