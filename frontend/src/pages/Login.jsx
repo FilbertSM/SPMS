@@ -25,35 +25,12 @@ const Login = () => {
     }
   }, []);
 
-  // --- VALIDATION LOGIC ---
+  // --- VALIDATION LOGIC (UPDATED: PASSED COMPLEXITY REMOVED) ---
   const validateForm = () => {
-    // 1. Strict Email Validation (Regex)
+    // 1. Strict Email Validation (Regex) - Tetap dipertahankan agar format email benar
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(email)) {
       setError("Please enter a valid company email address (e.g., name@domain.com).");
-      return false;
-    }
-
-    // 2. Strong Password Validation
-    // Minimal 8 karakter, 1 Huruf Besar, 1 Angka, 1 Simbol
-    const hasUppercase = /[A-Z]/.test(password);
-    const hasNumber = /[0-9]/.test(password);
-    const hasSymbol = /[^A-Za-z0-9]/.test(password);
-
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters long.");
-      return false;
-    }
-    if (!hasUppercase) {
-      setError("Password must contain at least one uppercase letter (A-Z).");
-      return false;
-    }
-    if (!hasNumber) {
-      setError("Password must contain at least one number (0-9).");
-      return false;
-    }
-    if (!hasSymbol) {
-      setError("Password must contain at least one special character/symbol (@, #, $, etc.).");
       return false;
     }
 
@@ -216,7 +193,7 @@ const Login = () => {
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#45474d]">lock</span>
                 <input 
-                  type={showPassword ? "text" : "password"} // Dynamic type switching
+                  type={showPassword ? "text" : "password"} 
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-10 pr-10 py-3 bg-[#f1f4f3] border border-transparent rounded-lg focus:bg-white focus:border-[#1b263b] focus:ring-2 focus:ring-[#1b263b]/10 outline-none transition-all text-[#1b263b] font-medium"

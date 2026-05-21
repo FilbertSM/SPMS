@@ -14,10 +14,14 @@ from jose import jwt, JWTError
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
 from fastapi.security import OAuth2PasswordBearer
 from app.core.security import SECRET_KEY, ALGORITHM
-
-# Import database engine and models
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from app.database.database import engine, SessionLocal
 from app.database import models
+
+# --- INISIALISATION LIMITER ---
+limiter = Limiter(key_func=get_remote_address)
 
 # --- CONFIGURATION EMAIL ---
 conf = ConnectionConfig(
@@ -48,6 +52,10 @@ def get_application() -> FastAPI:
         description="Secure Predictive Maintenance System API",
         version="1.0.0"
     )
+
+    # --- ADD A STATE & EXCEPTION HANDLER LIMITER TO THE APP ---
+    _app.state.limiter = limiter
+    _app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     origins = [
         "http://localhost:5173",
@@ -85,7 +93,6 @@ def get_db():
 
 @app.post("/api/register", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
 def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    # 1. Check for existing email
     existing_user = db.query(models.User).filter(models.User.email == user.email).first()
     if existing_user:
         raise HTTPException(
@@ -93,8 +100,6 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
             detail="Email already registered"
         )
     
-    # 2. 🛡️ STRICT BACKEND VALIDATION (Sinkron dengan Register.jsx kamu)
-    # A. Validasi Domain Resmi Perusahaan
     ALLOWED_DOMAINS = ['sakafarma.com', 'president.ac.id', 'student.president.ac.id']
     email_domain = user.email.split('@')[-1].lower() if '@' in user.email else ''
     if email_domain not in ALLOWED_DOMAINS:
@@ -103,7 +108,6 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
             detail="Registration is restricted to official company domains only."
         )
 
-    # B. Validasi Kompleksitas Password Satu Kalimat Padat
     has_uppercase = re.search(r"[A-Z]", user.password)
     has_number = re.search(r"[0-9]", user.password)
     has_symbol = re.search(r"[^A-Za-z0-9]", user.password)
@@ -116,17 +120,14 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     
     print(f"--- DEBUG: Security validation passed for user: {user.email} ---")
     
-    # 3. Hash password
     hashed_pw = security.get_password_hash(user.password)
     
-    # 4. Create the new user object
     new_user = models.User(
         full_name=user.full_name,  
         email=user.email,
         hashed_password=hashed_pw
     )
     
-    # 5. Save database
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -134,8 +135,10 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     return new_user
 
 
+# Addition of the @limiter.limit decorator and the request parameter: Request
 @app.post("/api/login", response_model=schemas.Token)
-def login(user_credentials: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def login(request: Request, user_credentials: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == user_credentials.username).first()
     
     if not user or not security.verify_password(user_credentials.password, user.hashed_password):
@@ -156,18 +159,14 @@ class EmailSchema(BaseModel):
     email: str
 
 
-# 👇 FIXED: Ditambahkan /api agar sinkron dengan Fetch di ForgotPassword.jsx 👇
 @app.post("/api/forgot-password")
 async def forgot_password(request: schemas.ForgotPasswordRequest, db: Session = Depends(get_db)):
-    # Pastikan email dicari dengan huruf kecil (lowercase) agar konsisten
     user = db.query(models.User).filter(models.User.email == request.email.strip()).first()
     
     if user:
-        # Menggunakan fungsi pembuatan token bawaan security.py
         reset_token = security.create_reset_token(data={"sub": user.email})
         reset_link = f"http://localhost:5173/reset-password?token={reset_token}"
         
-        # Format HTML Email
         message = MessageSchema(
             subject="SPMS - Password Reset Request",
             recipients=[user.email],
@@ -186,12 +185,10 @@ async def forgot_password(request: schemas.ForgotPasswordRequest, db: Session = 
             subtype=MessageType.html
         )
 
-        # 👇 PERBAIKAN UTAMA: Tambahkan parameter config= 👇
         fm = FastMail(config=conf)
         await fm.send_message(message)
         print(f"--- SUCCESS: Email reset password berhasil dikirim ke {user.email} ---")
     else:
-        # Debugging log di terminal lokal kamu untuk tahu kalau email tidak ditemukan di DB
         print(f"--- WARNING: Seseorang meminta reset untuk email {request.email}, tapi TIDAK TERDAFTAR di database ---")
         
     return {"message": "If this email is registered, a reset link has been sent."}
