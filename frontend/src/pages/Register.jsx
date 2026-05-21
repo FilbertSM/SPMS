@@ -6,13 +6,26 @@ const Register = () => {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState(''); 
+  const [showPassword, setShowPassword] = useState(false); 
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false); 
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isClosing, setIsClosing] = useState(false); 
+  const [successMsg, setSuccessMsg] = useState(null); 
 
-  const [isClosing, setIsClosing] = useState(false); // If you are using the smooth error close here too
-  const [successMsg, setSuccessMsg] = useState(null); // <-- ADD THIS
-  
-    const handleCloseError = () => {
+  // --- LIST DOMAIN RESMI YANG DIIZINKAN ---
+  const ALLOWED_DOMAINS = ['sakafarma.com', 'gmail.com', 'ac.id', 'co.id', 'president.ac.id', 'student.president.ac.id'];
+
+  // --- LIVE VALIDATION STATES ---
+  const isLengthValid = password.length >= 8 && password.length <= 20;
+  const hasLetter = /[a-zA-Z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  const hasSpecial = /[#?!@$%^&*]/.test(password);
+  const isPasswordStrong = isLengthValid && hasLetter && hasNumber && hasSpecial;
+  const isMatching = password === confirmPassword && confirmPassword !== '';
+
+  const handleCloseError = () => {
     setIsClosing(true); 
     setTimeout(() => {
       setError(null);     
@@ -29,59 +42,89 @@ const Register = () => {
     }
   }, [error]);
 
+  // --- FRONTEND VALIDATION LOGIC ---
+  const validateForm = () => {
+    // 1. Strict Email & Domain Validation
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
+      setError("Please enter a valid email address structure.");
+      return false;
+    }
+
+    const emailDomain = email.split('@')[1]?.toLowerCase();
+    if (!ALLOWED_DOMAINS.includes(emailDomain)) {
+      setError("Registration is restricted to official company domains only.");
+      return false;
+    }
+
+    // 2. Strong Password Complexity Check
+    if (!isPasswordStrong) {
+      setError("Please meet all password requirements.");
+      return false;
+    }
+
+    // 3. Double Password Validation
+    if (!isMatching) {
+      setError("Passwords do not match.");
+      return false;
+    }
+
+    return true;
+  };
+
   const handleRegister = async (e) => {
     e.preventDefault();
     setError(null);
+
+    if (!validateForm()) return;
+
     setIsLoading(true);
 
     try {
-      // 1. Prepare JSON payload (Make sure 'fullName' matches your state variable name!)
       const payload = {
         full_name: fullName, 
         email: email,
         password: password
       };
 
-      // 2. Send as application/json
       const response = await fetch('http://127.0.0.1:8000/api/register', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json', // Critical difference from Login!
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
       });
 
-      // 3. Smart Error Handling
       if (!response.ok) {
         const errorData = await response.json();
         let errorMessage = 'Registration failed. Please try again.';
 
-        // Safely extract the exact error message from FastAPI
         if (errorData.detail) {
           if (typeof errorData.detail === 'string') {
-            errorMessage = errorData.detail; // Handles our "Email already registered" 400 error
+            errorMessage = errorData.detail; 
           } else if (Array.isArray(errorData.detail)) {
-            errorMessage = errorData.detail[0].msg; // Handles Pydantic 422 Validation errors (like short passwords)
+            errorMessage = errorData.detail[0].msg; 
           }
         }
         throw new Error(errorMessage);
       }
 
-      // 4. Success Logic
-      setSuccessMsg("Account created successfully! Redirecting...");
+      setSuccessMsg("Account created successfully! Redirecting to sign in...");
+      
       setTimeout(() => {
         navigate('/login');
-      }, 9500);
+      }, 2000);
 
     } catch (err) {
-      console.error("Registration Error:", err); // Helps debug in the F12 console
+      console.error("Registration Error:", err); 
       setError(err.message);
-      setIsLoading(false); // Guarantees the button ALWAYS resets
+      setIsLoading(false); 
     } 
   };
 
   return (
     <div className="auth-container">
+      {/* --- ERROR TOAST --- */}
       {error && (
         <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 bg-white border-l-4 border-[#e74c3c] px-6 py-4 shadow-2xl rounded-lg ${isClosing ? 'animate-toast-out' : 'animate-toast-in'}`}>
           <span className="material-symbols-outlined text-[#e74c3c]">error</span>
@@ -100,6 +143,7 @@ const Register = () => {
         </div>
       )}
 
+      {/* --- LEFT PANEL --- */}
       <div className="auth-left-panel order-2">
          <div className="absolute top-0 right-0 w-full h-full opacity-10">
           <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -111,65 +155,111 @@ const Register = () => {
             <span className="material-symbols-outlined text-3xl text-[#2ecc71]">shield_person</span>
           </div>
           <h2 className="text-3xl font-black font-headline mb-4 leading-tight">Strict Access Control</h2>
-          <p className="text-[#828da7] text-sm leading-relaxed mb-8">
+          <p className="text-[#c5c6cd] text-sm leading-relaxed mb-8">
             Registration requires administrator approval. All access logs are tracked via Role-Based Access Control (RBAC).
           </p>
         </div>
       </div>
 
+      {/* --- RIGHT PANEL --- */}
       <div className="auth-right-panel order-1 overflow-y-auto">
         <div className="auth-card my-auto">
-          <div className="mb-8 text-center lg:text-left">
+          <div className="mb-6 text-center lg:text-left">
             <h3 className="heading-secondary">Request System Access</h3>
             <p className="text-subtitle mt-2">Submit your details to gain SPMS credentials.</p>
           </div>
 
           <form onSubmit={handleRegister} className="space-y-4">
-            {error && (
-              <div className="alert-error-box">
-                <span className="material-symbols-outlined text-sm">error</span>
-                {error}
-              </div>
-            )}
-
+            {/* FULL NAME */}
             <div>
               <label className="form-label mb-1.5">Full Name</label>
               <input 
                 type="text" 
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="input-field"
+                className="w-full px-4 py-3 bg-[#f1f4f3] border border-transparent rounded-lg focus:bg-white focus:border-[#1b263b] focus:ring-2 focus:ring-[#1b263b]/10 outline-none transition-all text-[#1b263b] font-medium text-sm"
                 placeholder="e.g. Budi Prasetyo"
                 required
               />
             </div>
 
+            {/* COMPANY EMAIL */}
             <div>
               <label className="form-label mb-1.5">Company Email</label>
               <input 
-                type="email" 
+                type="type" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="input-field"
+                className="w-full px-4 py-3 bg-[#f1f4f3] border border-transparent rounded-lg focus:bg-white focus:border-[#1b263b] focus:ring-2 focus:ring-[#1b263b]/10 outline-none transition-all text-[#1b263b] font-medium text-sm"
                 placeholder="e.g. budi.p@sakafarma.com"
                 required
               />
             </div>
 
+            {/* PASSWORD */}
             <div>
               <label className="form-label mb-1.5">Password</label>
-              <input 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="input-field"
-                placeholder="Create a strong password"
-                required
-              />
+              <div className="relative">
+                <input 
+                  type={showPassword ? "text" : "password"} 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-4 pr-10 py-3 bg-[#f1f4f3] border border-transparent rounded-lg focus:bg-white focus:border-[#1b263b] focus:ring-2 focus:ring-[#1b263b]/10 outline-none transition-all text-[#1b263b] font-medium text-sm"
+                  placeholder="••••••••"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#45474d] hover:text-[#1b263b] bg-transparent border-none cursor-pointer flex items-center"
+                >
+                  <span className="material-symbols-outlined text-xl">
+                    {showPassword ? "visibility_off" : "visibility"}
+                  </span>
+                </button>
+              </div>
+
+              {/* LIVE VALIDATION CHECKLIST FOR REGISTER */}
+              <div className="space-y-1.5 mt-2.5 px-1">
+                <ValidationItem label="8 characters (20 max)" isValid={isLengthValid} />
+                <ValidationItem label="1 letter, 1 number, 1 special character (# ? ! @)" isValid={hasLetter && hasNumber && hasSpecial} />
+                <ValidationItem label="Strong password" isValid={isPasswordStrong} />
+              </div>
+            </div>
+
+            {/* CONFIRM PASSWORD */}
+            <div>
+              <label className="form-label mb-1.5">Confirm Password</label>
+              <div className="relative">
+                <input 
+                  type={showConfirmPassword ? "text" : "password"} 
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className={`w-full pl-4 pr-10 py-3 bg-[#f1f4f3] border rounded-lg outline-none transition-all text-[#1b263b] font-medium text-sm ${
+                    isMatching ? 'border-green-500/50 focus:border-green-500' : 'border-transparent focus:border-[#1b263b]'
+                  }`}
+                  placeholder="••••••••"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#45474d] hover:text-[#1b263b] bg-transparent border-none cursor-pointer flex items-center"
+                >
+                  <span className="material-symbols-outlined text-xl">
+                    {showConfirmPassword ? "visibility_off" : "visibility"}
+                  </span>
+                </button>
+              </div>
             </div>
 
             <div className="pt-2">
-              <button type="submit" disabled={isLoading} className="btn-primary mt-0">
+              {/* Button disabled dynamically if criteria is not met */}
+              <button 
+                type="submit" 
+                disabled={isLoading || !isPasswordStrong || !isMatching} 
+                className="btn-primary mt-0 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
                 {isLoading ? (
                   <>
                     <span className="material-symbols-outlined animate-spin text-sm">sync</span>
@@ -190,5 +280,17 @@ const Register = () => {
     </div>
   );
 };
+
+// --- HELPER COMPONENT FOR CHECKLIST ---
+const ValidationItem = ({ label, isValid }) => (
+  <div className="flex items-center gap-2">
+    <span className={`material-symbols-outlined text-xs ${isValid ? 'text-[#2ecc71]' : 'text-gray-400'}`}>
+      {isValid ? 'check' : 'circle'}
+    </span>
+    <span className={`text-[11px] font-medium ${isValid ? 'text-gray-700' : 'text-gray-400'}`}>
+      {label}
+    </span>
+  </div>
+);
 
 export default Register;

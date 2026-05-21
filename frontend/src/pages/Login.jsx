@@ -3,21 +3,48 @@ import { Link, useNavigate } from 'react-router-dom';
 import ForgotPasswordModal from './ForgotPasswordModal';
 
 const Login = () => {
-  // Setup Navigation
   const navigate = useNavigate();
 
-  // 1. Setup State to track user inputs and UI status
+  // --- STATE MANAGEMENT ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false); // New: Remember Me
+  const [showPassword, setShowPassword] = useState(false); // New: Show/Hide Password
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [successMsg, setSuccessMsg] = useState(null);
 
+  // New: Load saved email from Remember Me on component mount
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('spms_remembered_email');
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
+
+  // --- VALIDATION LOGIC (UPDATED: PASSED COMPLEXITY REMOVED) ---
+  const validateForm = () => {
+    // 1. Strict Email Validation (Regex) - Tetap dipertahankan agar format email benar
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email)) {
+      setError("Please enter a valid company email address (e.g., name@domain.com).");
+      return false;
+    }
+
+    return true;
+  };
+
+  // --- HANDLERS ---
   const handleLogin = async (e) => {
     e.preventDefault();
     setError(null);
+
+    // Run client-side validation first
+    if (!validateForm()) return;
+
     setIsLoading(true);
 
     try {
@@ -40,10 +67,16 @@ const Login = () => {
       const data = await response.json();
       localStorage.setItem('spms_token', data.access_token);
       
+      // Handle Remember Me storage
+      if (rememberMe) {
+        localStorage.setItem('spms_remembered_email', email);
+      } else {
+        localStorage.removeItem('spms_remembered_email');
+      }
+
       console.log("Authentication successful. Token secured.");
       setSuccessMsg("Login successful! Redirecting...");
       
-      // Delay the redirect by 1.5 seconds to show the toast
       setTimeout(() => {
         navigate('/');
       }, 1000);
@@ -55,18 +88,17 @@ const Login = () => {
   };
 
   const handleCloseError = () => {
-    setIsClosing(true); // 1. Trigger the slide-up animation
+    setIsClosing(true);
     setTimeout(() => {
-      setError(null);     // 2. Actually remove it from the screen
-      setIsClosing(false); // 3. Reset for next time
-    }, 400); // 400ms matches our CSS animation duration
+      setError(null);
+      setIsClosing(false);
+    }, 400);
   };
 
-  // Auto-dismiss the toast after 4 seconds
   useEffect(() => {
     if (error) {
       const timer = setTimeout(() => {
-        handleCloseError(); // <-- Update this line
+        handleCloseError();
       }, 4000);
       return () => clearTimeout(timer);
     }
@@ -80,7 +112,7 @@ const Login = () => {
           <span className="material-symbols-outlined text-[#e74c3c]">error</span>
           <p className="text-sm font-bold text-[#1b263b]">{error}</p>
           <button 
-            onClick={handleCloseError} /* <-- Update this line */
+            onClick={handleCloseError}
             className="ml-4 text-[#c5c6cd] hover:text-[#45474d] transition-colors bg-transparent border-none cursor-pointer"
           >
             <span className="material-symbols-outlined text-sm">close</span>
@@ -93,6 +125,8 @@ const Login = () => {
           <p className="text-sm font-bold text-[#1b263b]">{successMsg}</p>
         </div>
       )}
+      
+      {/* --- LEFT PANEL --- */}
       <div className="auth-left-panel">
         <div className="absolute top-0 left-0 w-full h-full opacity-10">
           <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -115,6 +149,7 @@ const Login = () => {
         </div>
       </div>
 
+      {/* --- RIGHT PANEL --- */}
       <div className="auth-right-panel">
         <div className="auth-card">
           <div className="mb-8 text-center lg:text-left">
@@ -123,6 +158,7 @@ const Login = () => {
           </div>
 
           <form onSubmit={handleLogin} className="space-y-5">
+            {/* EMAIL INPUT */}
             <div>
               <label className="block text-[11px] font-bold text-[#45474d] uppercase tracking-widest mb-2 font-label">
                 Company Email
@@ -140,6 +176,7 @@ const Login = () => {
               </div>
             </div>
 
+            {/* PASSWORD INPUT */}
             <div>
               <div className="flex justify-between items-center mb-2">
                 <label className="text-[11px] font-bold text-[#45474d] uppercase tracking-widest font-label">
@@ -156,16 +193,41 @@ const Login = () => {
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#45474d]">lock</span>
                 <input 
-                  type="password" 
+                  type={showPassword ? "text" : "password"} 
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-[#f1f4f3] border border-transparent rounded-lg focus:bg-white focus:border-[#1b263b] focus:ring-2 focus:ring-[#1b263b]/10 outline-none transition-all text-[#1b263b] font-medium"
+                  className="w-full pl-10 pr-10 py-3 bg-[#f1f4f3] border border-transparent rounded-lg focus:bg-white focus:border-[#1b263b] focus:ring-2 focus:ring-[#1b263b]/10 outline-none transition-all text-[#1b263b] font-medium"
                   placeholder="••••••••"
                   required
                 />
+                {/* SHOW/HIDE PASSWORD ICON BUTTON */}
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#45474d] hover:text-[#1b263b] bg-transparent border-none cursor-pointer flex items-center"
+                >
+                  <span className="material-symbols-outlined text-xl">
+                    {showPassword ? "visibility_off" : "visibility"}
+                  </span>
+                </button>
               </div>
             </div>
 
+            {/* REMEMBER ME CHECKBOX */}
+            <div className="flex items-center">
+              <input
+                id="remember_me"
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-[#1b263b] focus:ring-[#1b263b] cursor-pointer"
+              />
+              <label htmlFor="remember_me" className="ml-2 block text-xs font-bold text-[#45474d] uppercase tracking-widest cursor-pointer select-none">
+                Remember Me
+              </label>
+            </div>
+
+            {/* SUBMIT BUTTON */}
             <button type="submit" disabled={isLoading} className="btn-primary">
               {isLoading ? (
                 <>
@@ -184,7 +246,6 @@ const Login = () => {
         </div>
       </div>
 
-      {/* Place the Modal at the bottom of the main container */}
       <ForgotPasswordModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 

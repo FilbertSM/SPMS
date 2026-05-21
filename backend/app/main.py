@@ -5,6 +5,7 @@ from app import models, schemas, database
 from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core import security
+from app.core import security
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager # Fixes line 18
@@ -77,6 +78,7 @@ def get_application() -> FastAPI:
         allow_headers=["*"],
     )
 
+
     return _app
 
 app = get_application()
@@ -102,6 +104,7 @@ if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
 
 
+@app.post("/api/register", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
 @app.post("/api/register", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
 def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     # 1. Check for existing email
@@ -130,6 +133,7 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    
     
     return new_user
 
@@ -164,7 +168,7 @@ class EmailSchema(BaseModel):
 
 @app.post("/forgot-password")
 async def forgot_password(request: schemas.ForgotPasswordRequest, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.email == request.email).first()
+    user = db.query(models.User).filter(models.User.email == request.email.strip()).first()
     
     if user:
         reset_token = security.create_reset_token(data={"sub": user.email})
@@ -174,6 +178,7 @@ async def forgot_password(request: schemas.ForgotPasswordRequest, db: Session = 
         
         # Create the email content
         message = MessageSchema(
+            subject="SPMS - Password Reset Request",
             subject="SPMS - Password Reset Request",
             recipients=[user.email],
             body=f"""
@@ -187,7 +192,16 @@ async def forgot_password(request: schemas.ForgotPasswordRequest, db: Session = 
 
         fm = FastMail(conf)
         await fm.send_message(message)
+        print(f"--- SUCCESS: Email reset password berhasil dikirim ke {user.email} ---")
+    else:
+        print(f"--- WARNING: Seseorang meminta reset untuk email {request.email}, tapi TIDAK TERDAFTAR di database ---")
         
+    return {"message": "If this email is registered, a reset link has been sent."}
+
+
+class ResetPassword(BaseModel):
+    token: str
+    new_password: str
     return {"message": "If this email is registered, a reset link has been sent."}
 
 
@@ -208,6 +222,7 @@ def reset_password(data: schemas.ResetPassword, db: Session = Depends(get_db)):
             raise HTTPException(status_code=401, detail="Invalid token scope")
             
     except jwt.JWTError:
+        raise HTTPException(status_code=401, detail="Token expired or invalid")
         raise HTTPException(status_code=401, detail="Token expired or invalid")
 
     # 3. Find the user
@@ -260,6 +275,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 
 # Make sure this route exists so React has somewhere to go!
 @app.get("/api/users/me", response_model=schemas.UserResponse)
+def read_users_me(current_user: models.User = Depends(get_current_user)):
 def read_users_me(current_user: models.User = Depends(get_current_user)):
     return current_user
 

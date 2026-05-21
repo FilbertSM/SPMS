@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel
 
 class UserCreate(BaseModel):
     full_name: str
@@ -28,3 +29,6 @@ class ForgotPasswordRequest(BaseModel):
 
 class UserPreferencesUpdate(BaseModel):
     email_notifications: bool
+
+    class Config:
+        from_attributes = True

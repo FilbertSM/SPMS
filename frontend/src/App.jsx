@@ -19,9 +19,6 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* Redirect root ke /app */}
-        <Route path="/" element={<Navigate to="/app" replace />} />
-
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -31,25 +28,23 @@ function App() {
         <Route path="/pma-dashboard" element={<PmaDashboard />} />
         <Route path="/vibration-chart" element={<MotorChart />} />
 
-        {/* Internal Routes - PROTECTED */}
-        <Route 
-          path="/app" 
-          element={
-            <ProtectedRoute>
-              <Layout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Dashboard />} /> 
-          <Route path="alerts" element={<Alerts />} />
-          
-          {/* Rute Audit Trail kamu ada di sini */}
-          <Route path="audit" element={<AuditLogs />} />
-          
-          <Route path="settings" element={<Settings />} />
-          <Route path="support" element={<div className="p-8 bg-[#f1f4f3] flex-1"><h1 className="text-2xl font-bold font-headline">Support Center</h1></div>} />
-          <Route path="status" element={<div className="p-8 bg-[#f1f4f3] flex-1"><h1 className="text-2xl font-bold font-headline">System Status</h1></div>} />
+        <Route element={<ProtectedRoute />}>
+          {/* Redirect root ke /app */}
+          <Route path="/" element={<Navigate to="/app" replace />} />
+
+          {/* Internal Routes - PROTECTED */}
+          <Route path="/app" element={<Layout />}>
+            <Route index element={<Dashboard />} /> 
+            <Route path="alerts" element={<Alerts />} />            
+            <Route path="audit" element={<AuditLogs />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="support" element={<div className="p-8 bg-[#f1f4f3] flex-1"><h1 className="text-2xl font-bold font-headline">Support Center</h1></div>} />
+            <Route path="status" element={<div className="p-8 bg-[#f1f4f3] flex-1"><h1 className="text-2xl font-bold font-headline">System Status</h1></div>} />
+          </Route>
         </Route>
+
+        {/* Catch-all untuk URL acak yang tidak terdaftar, lempar kembali ke root */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );
