@@ -4,13 +4,13 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 const ResetPassword = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
-    const token = searchParams.get('token'); // Mengambil token dari URL string
+    const token = searchParams.get('token'); 
     
     // --- STATE MANAGEMENT ---
     const [newPassword, setNewPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState(''); // Kolom konfirmasi
-    const [showPassword, setShowPassword] = useState(false); // Toggle mata password baru
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false); // Toggle mata konfirmasi
+    const [confirmPassword, setConfirmPassword] = useState(''); 
+    const [showPassword, setShowPassword] = useState(false); 
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [status, setStatus] = useState({ type: '', message: '' });
     const [isLoading, setIsLoading] = useState(false);
 

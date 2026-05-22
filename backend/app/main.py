@@ -19,6 +19,10 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from app.database.database import engine, SessionLocal
 from app.database import models
+from fastapi import Request
+from fastapi.responses import StreamingResponse
+import io
+import csv
 
 # --- INISIALISATION LIMITER ---
 limiter = Limiter(key_func=get_remote_address)
@@ -89,6 +93,61 @@ def get_db():
     finally:
         db.close()
 
+
+# --- ACCESS CONTROL HELPER ---
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        token_user_id = payload.get("user_id")
+        
+        if token_user_id is None:
+            raise credentials_exception
+            
+    except JWTError:
+        raise credentials_exception
+        
+    user = db.query(models.User).filter(models.User.id == token_user_id).first()
+    
+    if user is None:
+        raise credentials_exception
+        
+    return user
+
+def get_current_admin(
+    request: Request, 
+    current_user: models.User = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    if current_user.role != "admin":
+        client_ip = request.client.host if request.client else "Unknown"
+        user_agent = request.headers.get("user-agent", "Unknown")
+        
+        log = models.AuditLog(
+            user_email=current_user.email,
+            action="UNAUTHORIZED_ACCESS",
+            status="FAILED",
+            ip_address=client_ip,
+            browser_info=user_agent
+        )
+        db.add(log)
+        db.commit()
+        
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access Denied: Administrative Privileges Required"
+        )
+    return current_user
+
+
 # --- AUTHENTICATION ENDPOINTS ---
 
 @app.post("/api/register", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
@@ -141,27 +200,79 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
 def login(request: Request, user_credentials: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == user_credentials.username).first()
     
+    # Menangkap IP Address dan User Agent dari request
+    client_ip = request.client.host if request.client else "Unknown"
+    user_agent = request.headers.get("user-agent", "Unknown")
+    
+    # 1. Skenario Gagal Login (Catat log status FAILED)
     if not user or not security.verify_password(user_credentials.password, user.hashed_password):
+        failed_log = models.AuditLog(
+            user_email=user_credentials.username,
+            action="USER_LOGIN",
+            status="FAILED",
+            ip_address=client_ip,
+            browser_info=user_agent
+        )
+        db.add(failed_log)
+        db.commit()
+        
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, 
             detail="Invalid Credentials",
             headers={"WWW-Authenticate": "Bearer"}
         )
         
+    # 2. Skenario Sukses Login (Catat log status SUCCESS)
+    success_log = models.AuditLog(
+        user_email=user.email,
+        action="USER_LOGIN",
+        status="SUCCESS",
+        ip_address=client_ip,
+        browser_info=user_agent
+    )
+    db.add(success_log)
+    db.commit()
+        
+    # Generate Token
     access_token = security.create_access_token(
         data={"user_id": user.id, "role": user.role}
     )
     
     return {"access_token": access_token, "token_type": "bearer"}
 
-
 class EmailSchema(BaseModel):
     email: str
 
+@app.post("/api/logout")
+def logout(
+    request: Request, 
+    current_user: models.User = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    client_ip = request.client.host if request.client else "Unknown"
+    user_agent = request.headers.get("user-agent", "Unknown")
+    
+    # --- LOG: USER LOGOUT ---
+    log = models.AuditLog(
+        user_email=current_user.email,
+        action="USER_LOGOUT",
+        status="SUCCESS",
+        ip_address=client_ip,
+        browser_info=user_agent
+    )
+    db.add(log)
+    db.commit()
+    
+    return {"message": "Logged out successfully"}
 
 @app.post("/api/forgot-password")
-async def forgot_password(request: schemas.ForgotPasswordRequest, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.email == request.email.strip()).first()
+async def forgot_password(request: Request, body: schemas.ForgotPasswordRequest, db: Session = Depends(get_db)):
+    # Ambil IP dan User Agent
+    client_ip = request.client.host if request.client else "Unknown"
+    user_agent = request.headers.get("user-agent", "Unknown")
+    
+    # Perhatikan: gunakan body.email
+    user = db.query(models.User).filter(models.User.email == body.email.strip()).first()
     
     if user:
         reset_token = security.create_reset_token(data={"sub": user.email})
@@ -187,19 +298,41 @@ async def forgot_password(request: schemas.ForgotPasswordRequest, db: Session = 
 
         fm = FastMail(config=conf)
         await fm.send_message(message)
-        print(f"--- SUCCESS: Email reset password berhasil dikirim ke {user.email} ---")
-    else:
-        print(f"--- WARNING: Seseorang meminta reset untuk email {request.email}, tapi TIDAK TERDAFTAR di database ---")
         
+        # --- LOG: PERMINTAAN RESET VALID ---
+        log = models.AuditLog(
+            user_email=user.email,
+            action="PASSWORD_RESET_REQ",
+            status="SUCCESS",
+            ip_address=client_ip,
+            browser_info=user_agent
+        )
+        db.add(log)
+        db.commit()
+    else:
+        # --- LOG: PERMINTAAN RESET DARI EMAIL TIDAK DIKENAL ---
+        log = models.AuditLog(
+            user_email=body.email.strip(),
+            action="PASSWORD_RESET_REQ",
+            status="FAILED",
+            ip_address=client_ip,
+            browser_info=user_agent
+        )
+        db.add(log)
+        db.commit()
+        
+    # Selalu return sukses (seperti di frontend) untuk keamanan
     return {"message": "If this email is registered, a reset link has been sent."}
-
 
 class ResetPassword(BaseModel):
     token: str
     new_password: str
 
 @app.post("/api/reset-password")
-def reset_password(data: schemas.ResetPassword, db: Session = Depends(get_db)):
+def reset_password(request: Request, data: schemas.ResetPassword, db: Session = Depends(get_db)):
+    client_ip = request.client.host if request.client else "Unknown"
+    user_agent = request.headers.get("user-agent", "Unknown")
+
     try:
         unverified_payload = jwt.get_unverified_claims(data.token)
         email: str = unverified_payload.get("sub")
@@ -212,41 +345,36 @@ def reset_password(data: schemas.ResetPassword, db: Session = Depends(get_db)):
 
     user = db.query(models.User).filter(models.User.email == email).first()
     if not user:
-            raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="User not found")
         
+    # Update password baru
     user.hashed_password = security.get_password_hash(data.new_password)
+    
+    # --- LOG: RESET PASSWORD BERHASIL ---
+    reset_log = models.AuditLog(
+        user_email=user.email,
+        action="PASSWORD_RESET_SUCCESS",
+        status="SUCCESS",
+        ip_address=client_ip,
+        browser_info=user_agent
+    )
+    db.add(reset_log)
     db.commit()
 
     return {"message": "Password updated successfully. You can now login."}
 
-# --- ACCESS CONTROL HELPER ---
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
-
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+@app.get("/api/audit-logs")
+def get_audit_logs(
+    current_user: models.User = Depends(get_current_admin), 
+    db: Session = Depends(get_db)
+):
+    logs = db.query(models.AuditLog).order_by(models.AuditLog.timestamp.desc()).all()
     
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        token_user_id = payload.get("user_id")
+    if not logs:
+        return []
         
-        if token_user_id is None:
-            raise credentials_exception
-            
-    except JWTError:
-        raise credentials_exception
-        
-    user = db.query(models.User).filter(models.User.id == token_user_id).first()
-    
-    if user is None:
-        raise credentials_exception
-        
-    return user
-
+    return logs
 
 @app.get("/api/users/me", response_model=schemas.UserResponse)
 def read_users_me(current_user: models.User = Depends(get_current_user)):
@@ -254,14 +382,63 @@ def read_users_me(current_user: models.User = Depends(get_current_user)):
 
 @app.patch("/api/users/me/preferences")
 def update_user_preferences(
+    request: Request,
     preferences: schemas.UserPreferencesUpdate, 
     current_user: models.User = Depends(get_current_user), 
     db: Session = Depends(get_db)
 ):
     current_user.email_notifications = preferences.email_notifications
+    
+    # --- LOG: UPDATE PREFERENSI ---
+    client_ip = request.client.host if request.client else "Unknown"
+    user_agent = request.headers.get("user-agent", "Unknown")
+    
+    log = models.AuditLog(
+        user_email=current_user.email,
+        action="PREFERENCES_UPDATED",
+        status="SUCCESS",
+        ip_address=client_ip,
+        browser_info=user_agent
+    )
+    db.add(log)
     db.commit()
+    
     return {"message": "Preferences updated successfully", "email_notifications": current_user.email_notifications}
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    
+@app.get("/api/audit-logs/export")
+def export_audit_logs(
+    current_user: models.User = Depends(get_current_admin), 
+    db: Session = Depends(get_db)
+):
+    logs = db.query(models.AuditLog).order_by(models.AuditLog.timestamp.desc()).all()
+    
+    stream = io.StringIO()
+    csv_writer = csv.writer(stream)
+    
+    # Menulis Header / Judul Kolom di Excel
+    csv_writer.writerow(["ID", "Timestamp (UTC)", "User Email", "Action", "Status", "IP Address", "Browser Info"])
+    
+    # Menulis isi datanya
+    for log in logs:
+        # Mengubah format waktu agar rapi di Excel
+        time_str = log.timestamp.strftime("%Y-%m-%d %H:%M:%S") if log.timestamp else "N/A"
+        csv_writer.writerow([
+            log.id, 
+            time_str, 
+            log.user_email or "System/Anonymous", 
+            log.action, 
+            log.status, 
+            log.ip_address or "N/A", 
+            log.browser_info or "N/A"
+        ])
+        
+    stream.seek(0)
+    
+    response = StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
+    response.headers["Content-Disposition"] = "attachment; filename=security_audit_report.csv"
+    
+    return response

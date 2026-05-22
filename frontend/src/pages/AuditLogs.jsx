@@ -6,6 +6,9 @@ const AuditLogs = () => {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     const fetchLogs = async () => {
@@ -34,6 +37,11 @@ const AuditLogs = () => {
     fetchLogs();
   }, []);
 
+  // --- 2. RESET PAGE SAAT FILTER BERUBAH ---
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, dateFilter]);
+
   // Filter Logic
   const filteredLogs = logs.filter(log => {
     const matchesSearch = log.user_email?.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -41,6 +49,51 @@ const AuditLogs = () => {
     const matchesDate = dateFilter ? log.timestamp.includes(dateFilter) : true;
     return matchesSearch && matchesDate;
   });
+
+  // --- 3. LOGIKA SLICING DATA ---
+  const indexOfLastLog = currentPage * itemsPerPage;
+  const indexOfFirstLog = indexOfLastLog - itemsPerPage;
+  
+  // Data yang akan dirender di tabel HANYA 10 item ini
+  const currentLogs = filteredLogs.slice(indexOfFirstLog, indexOfLastLog);
+  const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
+  };
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const token = localStorage.getItem('spms_token');
+      const response = await fetch('http://localhost:8000/api/audit-logs/export', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) throw new Error("Failed to export report");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      
+      a.href = url;
+      a.download = `SPMS_Security_Audit_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   return (
     <div className="p-8 flex-1 overflow-y-auto bg-[#f1f4f3] font-body">
@@ -82,8 +135,13 @@ const AuditLogs = () => {
             onChange={(e) => setDateFilter(e.target.value)}
           />
         </div>
-        <button className="btn-secondary flex justify-center items-center gap-2 py-2.5 bg-[#e0e3e2] hover:bg-[#d0d3d2]">
-          <span className="material-symbols-outlined text-lg">download</span> Export Security Report
+        <button 
+          onClick={handleExport}
+          disabled={isExporting}
+          className="btn-secondary flex justify-center items-center gap-2 py-2.5 bg-[#e0e3e2] hover:bg-[#d0d3d2] disabled:opacity-50"
+        >
+          <span className="material-symbols-outlined text-lg">download</span> 
+          {isExporting ? 'Downloading...' : 'Export Security Report'}
         </button>
       </div>
 
@@ -108,10 +166,10 @@ const AuditLogs = () => {
           <tbody className="divide-y divide-[#ebeeed]">
             {isLoading ? (
               <tr><td colSpan="5" className="text-center py-20 text-sm text-[#75777d] italic">Decrypting audit logs...</td></tr>
-            ) : filteredLogs.length === 0 ? (
+            ) : currentLogs.length === 0 ? (
               <tr><td colSpan="5" className="text-center py-20 text-sm text-[#75777d]">No security events found matching current filters.</td></tr>
             ) : (
-              filteredLogs.map((log) => (
+              currentLogs.map((log) => (
                 <tr key={log.id} className="hover:bg-[#f9fafb] transition-colors group">
                   <td className="px-6 py-5">
                     <p className="text-[11px] font-bold text-[#1b263b]">{new Date(log.timestamp).toLocaleDateString()}</p>
@@ -147,12 +205,32 @@ const AuditLogs = () => {
         </table>
       </div>
 
-      {/* Pagination Placeholder */}
+      {/* --- 5. UI PAGINATION BARU --- */}
       <div className="mt-6 flex items-center justify-between">
-        <p className="text-xs text-[#75777d] font-medium">Showing {filteredLogs.length} security entries</p>
-        <div className="flex gap-2">
-          <button className="px-4 py-1.5 bg-white border border-[#c5c6cd]/40 text-[11px] font-bold rounded-lg disabled:opacity-50">Previous</button>
-          <button className="px-4 py-1.5 bg-white border border-[#c5c6cd]/40 text-[11px] font-bold rounded-lg disabled:opacity-50">Next</button>
+        <p className="text-xs text-[#75777d] font-medium">
+          Showing {filteredLogs.length === 0 ? 0 : indexOfFirstLog + 1} to {Math.min(indexOfLastLog, filteredLogs.length)} of {filteredLogs.length} security entries
+        </p>
+        
+        <div className="flex items-center gap-4">
+          <span className="text-[11px] text-[#75777d] font-bold">
+            Page {currentPage} of {totalPages || 1}
+          </span>
+          <div className="flex gap-2">
+            <button 
+              onClick={handlePrevPage}
+              disabled={currentPage === 1}
+              className="px-4 py-1.5 bg-white border border-[#c5c6cd]/40 text-[11px] font-bold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#f1f4f3] transition-colors"
+            >
+              Previous
+            </button>
+            <button 
+              onClick={handleNextPage}
+              disabled={currentPage === totalPages || totalPages === 0}
+              className="px-4 py-1.5 bg-white border border-[#c5c6cd]/40 text-[11px] font-bold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#f1f4f3] transition-colors"
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
     </div>
