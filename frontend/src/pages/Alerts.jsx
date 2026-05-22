@@ -113,10 +113,18 @@ const AlertCard = ({ alert }) => {
         </div>
 
         <div className="flex flex-row lg:flex-col gap-2 w-full lg:w-48 lg:pl-6 lg:border-l lg:border-[#c5c6cd]/30">
-          <button className={`${styles.button} flex-1 lg:w-full`}>
+          <button
+            disabled
+            title="Manual workflow only in the Form 4 demo"
+            className={`${styles.button} flex-1 lg:w-full opacity-60 cursor-not-allowed`}
+          >
             Acknowledge
           </button>
-          <button className="btn-secondary flex-1 lg:w-full py-2 bg-[#e0e3e2] justify-center">
+          <button
+            disabled
+            title="Manual workflow only in the Form 4 demo"
+            className="btn-secondary flex-1 lg:w-full py-2 bg-[#e0e3e2] justify-center opacity-60 cursor-not-allowed"
+          >
             Log Ticket
           </button>
         </div>
@@ -190,13 +198,13 @@ const Alerts = () => {
       <section className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h2 className="heading-primary text-3xl">Active Machine Alerts</h2>
-          <p className="text-subtitle mt-1">Real-time anomaly detection and predictive maintenance triggers.</p>
+          <p className="text-subtitle mt-1">Backend anomaly events for maintenance review. Alert actions are manual in this demo.</p>
         </div>
         <div className="flex gap-3">
-          <button className="btn-secondary">
+          <button disabled title="Filtering is not implemented in this demo" className="btn-secondary opacity-60 cursor-not-allowed">
             <span className="material-symbols-outlined text-[18px]">filter_list</span> Filter
           </button>
-          <button className="btn-primary py-2 px-4 w-auto mt-0">
+          <button disabled title="Report export is not implemented in this demo" className="btn-primary py-2 px-4 w-auto mt-0 opacity-60 cursor-not-allowed">
             <span className="material-symbols-outlined text-[18px]">download</span> Export Report
           </button>
         </div>
@@ -222,74 +230,22 @@ const Alerts = () => {
 
       <section className="space-y-6">
         <div className="flex items-center gap-4">
-          <h2 className="heading-secondary text-xl">Resolved Alerts & Maintenance Log</h2>
+          <h2 className="heading-secondary text-xl">Maintenance Review Workflow</h2>
           <div className="h-px flex-grow bg-[#e0e3e2]"></div>
         </div>
 
-        <div className="panel-card p-0 overflow-hidden">
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-[#f4f7f6]">
-              <tr>
-                <th className="px-6 py-4 text-[10px] font-label font-bold uppercase tracking-widest text-[#75777d]">Machine Asset</th>
-                <th className="px-6 py-4 text-[10px] font-label font-bold uppercase tracking-widest text-[#75777d]">Incident Period</th>
-                <th className="px-6 py-4 text-[10px] font-label font-bold uppercase tracking-widest text-[#75777d]">Outcome</th>
-                <th className="px-6 py-4 text-[10px] font-label font-bold uppercase tracking-widest text-[#75777d] text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#ebeeed]">
-              <tr className="hover:bg-[#f9fafb] transition-colors">
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded bg-white flex items-center justify-center border border-[#c5c6cd]/40">
-                      <span className="material-symbols-outlined text-[#75777d]">precision_manufacturing</span>
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-[#1b263b]">Centrifuge Pump 02</p>
-                      <p className="text-[10px] text-[#45474d] uppercase font-medium mt-0.5">Bearing Friction Anomaly</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <p className="text-sm font-medium text-[#1b263b]">Oct 24, 09:12 - 10:45</p>
-                  <p className="text-[10px] text-[#45474d] mt-0.5">Total Downtime: 1h 33m</p>
-                </td>
-                <td className="px-6 py-4">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#2ecc71]/20 text-[#00743a] uppercase">
-                    Resolved: Part Replaced
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <button className="text-[#1b263b] hover:text-[#2ecc71] font-bold text-xs uppercase tracking-wider underline decoration-2 underline-offset-4 transition-colors">View Log</button>
-                </td>
-              </tr>
-
-              <tr className="hover:bg-[#f9fafb] transition-colors">
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded bg-white flex items-center justify-center border border-[#c5c6cd]/40">
-                      <span className="material-symbols-outlined text-[#75777d]">settings_input_component</span>
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-[#1b263b]">Air Compressor Main</p>
-                      <p className="text-[10px] text-[#45474d] uppercase font-medium mt-0.5">Pressure Variance</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <p className="text-sm font-medium text-[#1b263b]">Oct 23, 14:00 - 14:15</p>
-                  <p className="text-[10px] text-[#45474d] mt-0.5">Total Downtime: 15m</p>
-                </td>
-                <td className="px-6 py-4">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#e0e3e2] text-[#45474d] uppercase">
-                    System Recalibrated
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <button className="text-[#1b263b] hover:text-[#2ecc71] font-bold text-xs uppercase tracking-wider underline decoration-2 underline-offset-4 transition-colors">View Log</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div className="panel-card">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-lg bg-[#f1f4f3] flex items-center justify-center text-[#1b263b]">
+              <span className="material-symbols-outlined">engineering</span>
+            </div>
+            <div>
+              <h3 className="heading-secondary text-lg">Manual workflow in Form 4 demo</h3>
+              <p className="text-sm text-[#45474d] mt-1 max-w-2xl">
+                The frontend displays backend anomaly events. Acknowledgement, ticket logging, filtering, and report export need backend workflow support before they can be enabled.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
     </div>

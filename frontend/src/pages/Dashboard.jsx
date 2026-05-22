@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { fetchJsonWithAuth } from '../utils/api';
 
 const FALLBACK_CURRENT = [4.8, 5.0, 4.6, 5.2, 4.9, 5.8, 6.4, 6.0, 6.2, 5.8, 6.1, 5.7, 6.6, 6.0, 6.3, 5.9, 6.7, 6.1, 6.4, 5.9, 6.2];
@@ -83,42 +84,54 @@ const Dashboard = () => {
   const [telemetry, setTelemetry] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [inferenceState, setInferenceState] = useState({
+    loading: false,
+    result: null,
+    error: null,
+  });
+
+  const loadDashboard = useCallback(async ({ showLoading = true } = {}) => {
+    try {
+      if (showLoading) {
+        setLoading(true);
+      }
+      const [summaryPayload, telemetryPayload] = await Promise.all([
+        fetchJsonWithAuth('/api/dashboard/summary'),
+        fetchJsonWithAuth('/api/telemetry/latest?limit=60'),
+      ]);
+
+      setSummary(summaryPayload);
+      setTelemetry(Array.isArray(telemetryPayload) ? [...telemetryPayload].reverse() : []);
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      if (showLoading) {
+        setLoading(false);
+      }
+    }
+  }, []);
 
   useEffect(() => {
-    let ignore = false;
-
-    const loadDashboard = async () => {
-      try {
-        setLoading(true);
-        const [summaryPayload, telemetryPayload] = await Promise.all([
-          fetchJsonWithAuth('/api/dashboard/summary'),
-          fetchJsonWithAuth('/api/telemetry/latest?limit=60'),
-        ]);
-
-        if (!ignore) {
-          setSummary(summaryPayload);
-          setTelemetry(Array.isArray(telemetryPayload) ? [...telemetryPayload].reverse() : []);
-          setError(null);
-        }
-      } catch (err) {
-        if (!ignore) {
-          setError(err.message);
-        }
-      } finally {
-        if (!ignore) {
-          setLoading(false);
-        }
-      }
-    };
-
     loadDashboard();
-    const timer = window.setInterval(loadDashboard, 60000);
+    const timer = window.setInterval(() => loadDashboard({ showLoading: false }), 60000);
 
-    return () => {
-      ignore = true;
-      window.clearInterval(timer);
-    };
-  }, []);
+    return () => window.clearInterval(timer);
+  }, [loadDashboard]);
+
+  const handleRunLatestInference = async () => {
+    setInferenceState((previous) => ({ ...previous, loading: true, error: null }));
+    try {
+      const result = await fetchJsonWithAuth(
+        '/api/predict/anomaly/latest?machine_id=PMA%20Granulator%20%2301',
+        { method: 'POST' },
+      );
+      setInferenceState({ loading: false, result, error: null });
+      await loadDashboard({ showLoading: false });
+    } catch (err) {
+      setInferenceState((previous) => ({ ...previous, loading: false, error: err.message }));
+    }
+  };
 
   const currentValues = useMemo(() => {
     const values = telemetry.map((row) => toNumber(row.impeller_ampere)).filter((value) => value !== null);
@@ -145,6 +158,14 @@ const Dashboard = () => {
   const anomalyScore = toNumber(latestPrediction?.reconstruction_error);
   const status = summary?.status || 'NO DATA';
   const statusConfig = statusStyle[status] || statusStyle['NO DATA'];
+  const statusDot =
+    status === 'CRITICAL'
+      ? 'bg-[#ba1a1a]'
+      : status === 'WARNING'
+        ? 'bg-[#805600]'
+        : status === 'NO DATA'
+          ? 'bg-[#75777d]'
+          : 'bg-[#00743a]';
   const hasTelemetry = telemetry.length > 0;
 
   const currentPoints = createPolylinePoints(currentValues, 1000, 100, 12);
@@ -184,15 +205,61 @@ const Dashboard = () => {
             </p>
           </div>
           <div className="mt-8 flex flex-wrap gap-4 z-10">
-            <button className="px-6 py-3 bg-gradient-to-br from-[#051125] to-[#1b263b] text-white text-xs font-bold uppercase tracking-widest rounded-lg flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-sm">
-              <span className="material-symbols-outlined text-sm">history</span>
-              View Historical Data
+            <button
+              onClick={handleRunLatestInference}
+              disabled={inferenceState.loading}
+              className="px-6 py-3 bg-gradient-to-br from-[#051125] to-[#1b263b] text-white text-xs font-bold uppercase tracking-widest rounded-lg flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <span className={`material-symbols-outlined text-sm ${inferenceState.loading ? 'animate-spin' : ''}`}>
+                {inferenceState.loading ? 'sync' : 'psychology'}
+              </span>
+              {inferenceState.loading ? 'Running Inference' : 'Run Latest Inference'}
             </button>
-            <button className="px-6 py-3 bg-[#e6e9e8] text-[#051125] text-xs font-bold uppercase tracking-widest rounded-lg flex items-center gap-2 hover:bg-[#e0e3e2] transition-colors">
+            <Link to="/app/pma" className="px-6 py-3 bg-[#e6e9e8] text-[#051125] text-xs font-bold uppercase tracking-widest rounded-lg flex items-center gap-2 hover:bg-[#e0e3e2] transition-colors">
+              <span className="material-symbols-outlined text-sm">history</span>
+              View PMA Data
+            </Link>
+            <button
+              disabled
+              title="Manual workflow only in the Form 4 demo"
+              className="px-6 py-3 bg-[#e6e9e8] text-[#45474d] text-xs font-bold uppercase tracking-widest rounded-lg flex items-center gap-2 cursor-not-allowed opacity-70"
+            >
               <span className="material-symbols-outlined text-sm">medical_services</span>
               Log Maintenance Ticket
             </button>
           </div>
+          <p className="mt-3 text-[11px] font-medium text-[#45474d]">
+            Maintenance tickets are recorded manually in this demo.
+          </p>
+          {inferenceState.error && (
+            <div className="mt-4 rounded-lg bg-[#ffdad6] px-4 py-3 text-xs font-bold text-[#ba1a1a]">
+              Latest inference failed: {inferenceState.error}
+            </div>
+          )}
+          {inferenceState.result && (
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3 rounded-lg bg-[#f7faf9] border border-[#c5c6cd]/30 p-4 text-xs">
+              <div>
+                <p className="font-bold uppercase text-[#45474d]">Source</p>
+                <p className="font-bold text-[#051125]">{inferenceState.result.source || 'latest window'}</p>
+              </div>
+              <div>
+                <p className="font-bold uppercase text-[#45474d]">Window</p>
+                <p className="font-bold text-[#051125]">
+                  {formatTime(inferenceState.result.window_start)} - {formatTime(inferenceState.result.window_end)}
+                </p>
+              </div>
+              <div>
+                <p className="font-bold uppercase text-[#45474d]">Severity</p>
+                <p className="font-bold text-[#051125]">{inferenceState.result.severity}</p>
+              </div>
+              <div>
+                <p className="font-bold uppercase text-[#45474d]">MAE / Threshold</p>
+                <p className="font-bold text-[#051125]">
+                  {formatNumber(inferenceState.result.reconstruction_error, 3)} / {formatNumber(inferenceState.result.threshold, 3)}
+                </p>
+              </div>
+            </div>
+          )}
           <div className="absolute top-0 right-0 w-64 h-full opacity-5 pointer-events-none">
             <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
               <path d="M44.7,-76.4C58.1,-69.2,69.2,-58.1,77.3,-44.7C85.4,-31.3,90.5,-15.7,89.3,-0.7C88.1,14.3,80.7,28.6,71.5,41.2C62.3,53.8,51.3,64.7,38.1,72.4C24.9,80.1,9.4,84.6,-5.6,83.1C-20.6,81.6,-35.1,74.1,-47.3,64.8C-59.5,55.5,-69.4,44.4,-76.1,31.5C-82.8,18.6,-86.3,3.9,-84.4,-10.1C-82.5,-24.1,-75.2,-37.4,-65.4,-48.5C-55.6,-59.6,-43.3,-68.5,-30.2,-75.4C-17.1,-82.3,-3.2,-87.2,11.2,-86.3C25.6,-85.4,44.7,-76.4,44.7,-76.4Z" fill="#051125" transform="translate(140 100)"></path>
@@ -209,7 +276,7 @@ const Dashboard = () => {
             <h3 className={`text-5xl font-extrabold font-headline ${statusConfig.text} tracking-tighter mt-1`}>{statusConfig.label}</h3>
           </div>
           <div className="flex items-center gap-2 bg-white/30 px-4 py-1.5 rounded-full">
-            <span className={`w-2 h-2 rounded-full ${status === 'CRITICAL' ? 'bg-[#ba1a1a]' : status === 'WARNING' ? 'bg-[#805600]' : 'bg-[#00743a]'}`}></span>
+            <span className={`w-2 h-2 rounded-full ${statusDot}`}></span>
             <span className={`text-[10px] font-bold uppercase ${statusConfig.text}`}>{loading ? 'Syncing backend' : `Last sample ${formatTime(latestReading?.timestamp)}`}</span>
           </div>
         </div>
@@ -294,7 +361,7 @@ const Dashboard = () => {
               </div>
             </div>
             <p className="text-[10px] text-center text-[#45474d] mt-4 leading-relaxed">
-              LSTM Autoencoder score is unsupervised anomaly detection, not validated RUL. Threshold: {threshold === null ? '-' : threshold.toFixed(3)}
+              LSTM Autoencoder score is unsupervised anomaly detection, not a remaining-life prediction. Threshold: {threshold === null ? '-' : threshold.toFixed(3)}
             </p>
           </div>
           <div className="mt-6 pt-6 border-t border-[#c5c6cd]/10 flex items-center justify-between">

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import ForgotPasswordModal from './ForgotPasswordModal';
+import { postForm } from '../utils/api';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -43,19 +44,7 @@ const Login = () => {
       formData.append('username', email);
       formData.append('password', password);
 
-      const response = await fetch('http://127.0.0.1:8000/api/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('Invalid email or password. Please try again.');
-      }
-
-      const data = await response.json();
+      const data = await postForm('/api/login', formData);
       localStorage.setItem('spms_token', data.access_token);
       
       // Handle Remember Me storage
@@ -69,7 +58,7 @@ const Login = () => {
       setSuccessMsg("Login successful! Redirecting...");
       
       setTimeout(() => {
-        navigate('/');
+        navigate('/app');
       }, 1000);
       
     } catch (err) {

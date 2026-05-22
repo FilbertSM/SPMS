@@ -24,9 +24,9 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/pma-dashboard" element={<PmaDashboard />} />
-        <Route path="/vibration-chart" element={<MotorChart />} />
+        <Route path="/profile" element={<Navigate to="/app/profile" replace />} />
+        <Route path="/pma-dashboard" element={<Navigate to="/app/pma" replace />} />
+        <Route path="/vibration-chart" element={<Navigate to="/app/vibration" replace />} />
 
         <Route element={<ProtectedRoute />}>
           {/* Redirect root ke /app */}
@@ -38,6 +38,9 @@ function App() {
             <Route path="alerts" element={<Alerts />} />            
             <Route path="audit" element={<AuditLogs />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="profile" element={<Profile />} />
+            <Route path="pma" element={<PmaDashboard />} />
+            <Route path="vibration" element={<MotorChart />} />
             <Route path="support" element={<div className="p-8 bg-[#f1f4f3] flex-1"><h1 className="text-2xl font-bold font-headline">Support Center</h1></div>} />
             <Route path="status" element={<div className="p-8 bg-[#f1f4f3] flex-1"><h1 className="text-2xl font-bold font-headline">System Status</h1></div>} />
           </Route>

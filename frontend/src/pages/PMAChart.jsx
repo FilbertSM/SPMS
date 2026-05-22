@@ -3,8 +3,6 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import { Calendar, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
-import TopNav from '../components/TopNav'; 
-import Sidebar from '../components/Sidebar';
 import { fetchJsonWithAuth } from '../utils/api';
 
 const dateInputValueFromToday = (offsetDays = 0) => {
@@ -91,27 +89,14 @@ const PmaDashboard = () => {
   const prevPage = () => setCurrentPage((prev) => (prev > 1 ? prev - 1 : prev));
 
   return (
-    // MASTER LAYOUT WRAPPER: Handles Sidebar and TopNav
-    <div className="flex h-screen bg-slate-50 overflow-hidden font-sans text-slate-800">
-      
-      {/* Sidebar goes here on the left */}
-      <Sidebar />
-
-      {/* Main Content Area (Right side) */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        
-        {/* Top Navigation goes here at the top */}
-        <TopNav />
-
-        {/* Scrollable Dashboard Content */}
-        <main className="flex-1 overflow-y-auto p-8">
+    <div className="page-container font-sans text-slate-800">
           
           {/* --- HEADER SECTION --- */}
           <div className="flex justify-between items-start mb-8 gap-6">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex-1">
               <h1 className="text-3xl font-bold text-slate-900 tracking-tight">PMA Granulator #01</h1>
               <p className="text-slate-500 mt-2">
-                System monitoring the wet granulation process. Real-time predictive maintenance enabled via LSTM neural network models.
+                System monitoring the wet granulation process with anomaly detection telemetry. This page is predictive monitoring only and does not control the machine.
               </p>
               
               <div className="flex items-center gap-4 mt-6">
@@ -252,9 +237,6 @@ const PmaDashboard = () => {
             </div>
 
           </div>
-
-        </main>
-      </div>
     </div>
   );
 };

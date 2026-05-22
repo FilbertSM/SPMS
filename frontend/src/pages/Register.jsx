@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { fetchJson } from '../utils/api';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -87,27 +88,10 @@ const Register = () => {
         password: password
       };
 
-      const response = await fetch('http://127.0.0.1:8000/api/register', {
+      await fetchJson('/api/register', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(payload),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        let errorMessage = 'Registration failed. Please try again.';
-
-        if (errorData.detail) {
-          if (typeof errorData.detail === 'string') {
-            errorMessage = errorData.detail; 
-          } else if (Array.isArray(errorData.detail)) {
-            errorMessage = errorData.detail[0].msg; 
-          }
-        }
-        throw new Error(errorMessage);
-      }
 
       setSuccessMsg("Account created successfully! Redirecting to sign in...");
       

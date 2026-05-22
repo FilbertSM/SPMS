@@ -1,5 +1,6 @@
 // src/components/ForgotPasswordModal.jsx
 import React, { useState } from 'react';
+import { fetchJson } from '../utils/api';
 
 const ForgotPasswordModal = ({ isOpen, onClose }) => {
   const [email, setEmail] = useState('');
@@ -12,12 +13,10 @@ const ForgotPasswordModal = ({ isOpen, onClose }) => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/forgot-password', {
+      const data = await fetchJson('/api/forgot-password', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
-      const data = await response.json();
       setStatus({ type: 'success', message: data.message });
     } catch {
       setStatus({ type: 'error', message: 'Connection failed.' });

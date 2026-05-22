@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { fetchBlobWithAuth, fetchJsonWithAuth } from '../utils/api';
 
 const AuditLogs = () => {
   const [logs, setLogs] = useState([]);
@@ -13,19 +14,7 @@ const AuditLogs = () => {
   useEffect(() => {
     const fetchLogs = async () => {
       try {
-        const token = localStorage.getItem('spms_token');
-        const response = await fetch('http://localhost:8000/api/audit-logs', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (!response.ok) {
-          if (response.status === 403) throw new Error("Access Denied: Administrative Privileges Required");
-          throw new Error("Failed to synchronize with security vault");
-        }
-
-        const data = await response.json();
+        const data = await fetchJsonWithAuth('/api/audit-logs');
         setLogs(data);
       } catch (err) {
         setError(err.message);
@@ -63,16 +52,7 @@ const AuditLogs = () => {
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      const token = localStorage.getItem('spms_token');
-      const response = await fetch('http://localhost:8000/api/audit-logs/export', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) throw new Error("Failed to export report");
-
-      const blob = await response.blob();
+      const blob = await fetchBlobWithAuth('/api/audit-logs/export');
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       

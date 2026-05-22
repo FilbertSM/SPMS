@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { fetchJson } from '../utils/api';
 
 const ResetPassword = () => {
     const [searchParams] = useSearchParams();
@@ -38,26 +39,18 @@ const ResetPassword = () => {
 
         setIsLoading(true);
         try {
-            const response = await fetch('http://127.0.0.1:8000/api/reset-password', {
+            await fetchJson('/api/reset-password', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ token, new_password: newPassword }),
             });
 
-            if (response.ok) {
-                // Notifikasi Sukses
-                setStatus({ type: 'success', message: 'Password updated successfully! Redirecting to login...' });
-                
-                // Otomatis kembali ke halaman login setelah 2 detik
-                setTimeout(() => {
-                    navigate('/login');
-                }, 2000);
-            } else {
-                const data = await response.json();
-                setStatus({ type: 'error', message: data.detail || "Failed to reset password. Token may be expired or already used." });
-            }
-        } catch {
-            setStatus({ type: 'error', message: "Connection failed. Please try again." });
+            setStatus({ type: 'success', message: 'Password updated successfully! Redirecting to login...' });
+            
+            setTimeout(() => {
+                navigate('/login');
+            }, 2000);
+        } catch (error) {
+            setStatus({ type: 'error', message: error.message || "Connection failed. Please try again." });
         } finally {
             setIsLoading(false);
         }

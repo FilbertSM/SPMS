@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { fetchJsonWithAuth } from '../utils/api';
 
 const TopNav = () => {
   const navigate = useNavigate();
@@ -24,21 +25,11 @@ const TopNav = () => {
       }
 
       try {
-        const response = await fetch('http://127.0.0.1:8000/api/users/me', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (response.ok) {
-          const userData = await response.json();
-          setUser(userData);
-        } else {
-          // Force logout if token is invalid or expired
-          handleLogout();
-        }
+        const userData = await fetchJsonWithAuth('/api/users/me');
+        setUser(userData);
       } catch (error) {
         console.error("Failed to fetch user data:", error);
+        handleLogout();
       }
     };
 
@@ -71,11 +62,19 @@ const TopNav = () => {
         
         {/* Quick Actions */}
         <div className="flex items-center gap-4">
-          <button className="p-2 hover:bg-[#ebeeed] dark:hover:bg-[#1b263b] rounded-full transition-colors relative">
+          <button
+            onClick={() => navigate('/app/alerts')}
+            className="p-2 hover:bg-[#ebeeed] dark:hover:bg-[#1b263b] rounded-full transition-colors relative"
+            title="Open alerts"
+          >
             <span className="material-symbols-outlined text-[#051125] dark:text-[#f7faf9]">notifications</span>
             <span className="absolute top-2 right-2 w-2 h-2 bg-[#ba1a1a] rounded-full border-2 border-[#f7faf9]"></span>
           </button>
-          <button className="p-2 hover:bg-[#ebeeed] dark:hover:bg-[#1b263b] rounded-full transition-colors">
+          <button
+            onClick={() => navigate('/app/audit')}
+            className="p-2 hover:bg-[#ebeeed] dark:hover:bg-[#1b263b] rounded-full transition-colors"
+            title="Open audit logs"
+          >
             <span className="material-symbols-outlined text-[#051125] dark:text-[#f7faf9]">verified_user</span>
           </button>
         </div>
@@ -106,7 +105,7 @@ const TopNav = () => {
             <div className="absolute right-0 mt-4 w-48 bg-white dark:bg-[#051125] rounded-xl shadow-xl border border-[#c5c6cd]/20 overflow-hidden z-50 transform origin-top-right transition-all">
               <div className="py-1">
                 <button 
-                  onClick={() => {setIsDropdownOpen(false); navigate('/profile');}}
+                  onClick={() => {setIsDropdownOpen(false); navigate('/app/profile');}}
                   className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#051125] dark:text-[#f1f4f3] hover:bg-[#ebeeed] dark:hover:bg-[#1b263b] flex items-center gap-3 transition-colors"
                 >
                   <span className="material-symbols-outlined text-[18px] text-[#45474d]">person</span>
@@ -114,7 +113,7 @@ const TopNav = () => {
                 </button>
                 
                 <button 
-                  onClick={() => setIsDropdownOpen(false)}
+                  onClick={() => {setIsDropdownOpen(false); navigate('/app/settings');}}
                   className="w-full text-left px-4 py-2.5 text-sm font-bold text-[#051125] dark:text-[#f1f4f3] hover:bg-[#ebeeed] dark:hover:bg-[#1b263b] flex items-center gap-3 transition-colors"
                 >
                   <span className="material-symbols-outlined text-[18px] text-[#45474d]">settings</span>

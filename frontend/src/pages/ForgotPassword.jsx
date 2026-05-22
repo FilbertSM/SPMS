@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { fetchJson } from '../utils/api';
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
@@ -12,13 +13,10 @@ const ForgotPassword = () => {
     setStatus({ type: '', message: '' });
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/forgot-password', {
+      const data = await fetchJson('/api/forgot-password', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
-
-      const data = await response.json();
       
       // Even if the email doesn't exist, we show success for security
       setStatus({ type: 'success', message: data.message });

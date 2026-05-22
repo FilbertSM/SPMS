@@ -37,13 +37,13 @@ const Sidebar = () => {
           </Link>
 
           {/* Menu PMA */}
-          <Link to="/pma-dashboard" className={getMenuClasses('/pma-dashboard')}>
+          <Link to="/app/pma" className={getMenuClasses('/app/pma')}>
             <span className="material-symbols-outlined">trending_up</span>
             <span>PMA</span>
           </Link>
 
           {/* Menu Vibration */}
-          <Link to="/vibration-chart" className={getMenuClasses('/vibration-dashboard')}>
+          <Link to="/app/vibration" className={getMenuClasses('/app/vibration')}>
             <span className="material-symbols-outlined">trending_up</span>
             <span>Vibration</span>
           </Link>
@@ -71,7 +71,11 @@ const Sidebar = () => {
       </div>
 
       <div className="mt-auto p-6 space-y-6">
-        <button className="w-full py-3 bg-[#1b263b] text-[#6bfe9c] font-bold rounded-lg text-xs uppercase tracking-widest hover:opacity-90 transition-opacity">
+        <button
+          disabled
+          title="Manual workflow only in the Form 4 demo"
+          className="w-full py-3 bg-[#1b263b]/60 text-[#f1f4f3] font-bold rounded-lg text-xs uppercase tracking-widest cursor-not-allowed"
+        >
             Log Ticket
         </button>
         <div className="space-y-1">
