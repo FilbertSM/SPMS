@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import ForgotPasswordModal from './ForgotPasswordModal';
 
@@ -7,23 +7,14 @@ const Login = () => {
 
   // --- STATE MANAGEMENT ---
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => localStorage.getItem('spms_remembered_email') || '');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false); // New: Remember Me
+  const [rememberMe, setRememberMe] = useState(() => Boolean(localStorage.getItem('spms_remembered_email'))); // New: Remember Me
   const [showPassword, setShowPassword] = useState(false); // New: Show/Hide Password
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [successMsg, setSuccessMsg] = useState(null);
-
-  // New: Load saved email from Remember Me on component mount
-  useEffect(() => {
-    const savedEmail = localStorage.getItem('spms_remembered_email');
-    if (savedEmail) {
-      setEmail(savedEmail);
-      setRememberMe(true);
-    }
-  }, []);
 
   // --- VALIDATION LOGIC (UPDATED: PASSED COMPLEXITY REMOVED) ---
   const validateForm = () => {
@@ -87,13 +78,13 @@ const Login = () => {
     }
   };
 
-  const handleCloseError = () => {
+  const handleCloseError = useCallback(() => {
     setIsClosing(true);
     setTimeout(() => {
       setError(null);
       setIsClosing(false);
     }, 400);
-  };
+  }, []);
 
   useEffect(() => {
     if (error) {
@@ -102,7 +93,7 @@ const Login = () => {
       }, 4000);
       return () => clearTimeout(timer);
     }
-  }, [error]);
+  }, [error, handleCloseError]);
 
   return (
     <div className="auth-container">

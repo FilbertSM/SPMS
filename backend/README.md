@@ -24,6 +24,19 @@ This command uses the `dev` profile to mount your local folder into the containe
 docker-compose --profile dev up --build -d
 ```
 
+If Docker commands fail with a Windows engine-pipe or permission error, start Docker Desktop and run the command from a shell/user that has Docker Desktop access.
+
+For local signup/login diagnosis, inspect the API and database logs:
+```bash
+docker compose --profile dev logs -f api-dev mariadb
+```
+
+If the local MariaDB volume was created before the current user schema, reset the local-only database volume and rebuild:
+```bash
+docker compose --profile dev down -v
+docker compose --profile dev up --build -d
+```
+
 ### 3. Run for Production
 This builds the optimized, security-hardened multi-stage image.
 ```bash
@@ -56,6 +69,53 @@ Once the server is running, FastAPI automatically generates interactive document
 *   **Swagger (Interactive API UI):** [http://localhost:8000/docs](http://localhost:8000/docs)
 *   **ReDoc (Alternative UI):** [http://localhost:8000/redoc](http://localhost:8000/redoc)
 *   **Health Check Endpoint:** [http://localhost:8000/](http://localhost:8000/)
+
+## SPMS ML Runtime Loop
+
+The Form 4 demo inference source is the imported `pma_l1` table. It contains the merged PMA, vibration, temperature, batch, process, and 1-minute timestamp fields needed to build model windows. The API does not control or stop the PMA Granulator machine; it only performs anomaly detection and dashboard monitoring.
+
+Runtime artifacts must be manually copied into:
+
+```text
+app/ml_integration/
+```
+
+Required files:
+
+```text
+spms_lstm_autoencoder_rebuild.keras
+spms_minmax_scaler_rebuild.pkl
+anomaly_threshold_rebuild.joblib
+spms_lstm_rebuild_metadata.json
+```
+
+The latest-window inference endpoint is:
+
+```bash
+POST /api/predict/anomaly/latest
+```
+
+It reads the latest valid 15-minute window from `pma_l1`, validates that every row is active-running, continuous at 1-minute intervals, complete across the 8 model features, and within one batch and one process, then saves the resulting anomaly event for `/api/dashboard/summary`.
+
+Manual/test inference remains available:
+
+```bash
+POST /api/predict/anomaly
+```
+
+Manual payloads must follow the same rules: 15 timestamped rows, complete model features, active-running PMA state, one batch, one process, and a continuous 1-minute grid.
+
+Dashboard data flow:
+
+* `GET /api/telemetry/latest` prefers mapped `pma_l1` rows and falls back to `telemetry_readings`.
+* `GET /api/dashboard/summary` returns latest telemetry, latest saved anomaly event, threshold metadata, artifact readiness, valid-window count, skipped-window count, and recent alerts.
+
+If `pma_l1` is missing or stale in Docker, reset the local-only database volume and rebuild so the `db_init` SQL imports run again:
+
+```bash
+docker compose --profile dev down -v
+docker compose --profile dev up --build -d
+```
 
 ## 🛡️ Security & Architecture
 

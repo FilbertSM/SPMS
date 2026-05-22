@@ -1,68 +1,84 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Calendar, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
 
 // --- NEW IMPORTS ---
 import TopNav from '../components/TopNav'; 
 import Sidebar from '../components/Sidebar';
+import { fetchJsonWithAuth } from '../utils/api';
+
+const dateInputValueFromToday = (offsetDays = 0) => {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  return date.toISOString().split('T')[0];
+};
+
+const buildTelemetryUrl = (baseUrl, range) => {
+  if (!range?.start || !range?.end) return baseUrl;
+  const params = new URLSearchParams({ start: range.start, end: range.end });
+  return `${baseUrl}?${params.toString()}`;
+};
 
 const MotorChart = () => {
   const [telemetryData, setTelemetryData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   
-  const [startDate, setStartDate] = useState(new Date(Date.now() - 86400000).toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(() => dateInputValueFromToday(-1));
+  const [endDate, setEndDate] = useState(() => dateInputValueFromToday());
+  const [appliedRange, setAppliedRange] = useState(null);
 
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 50;
 
-  const fetchTelemetry = async () => {
+  const fetchTelemetry = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
-      const token = localStorage.getItem('spms_token');
-      const response = await fetch(`http://127.0.0.1:8000/api/motor/telemetry?start=${startDate}&end=${endDate}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        
-        const roundSafe = (val) => {
-          return val != null ? Number(Number(val).toFixed(2)) : 0;
-        };
-        
-        const formattedData = data.map(item => ({
-          ...item,
-          readableTime: new Date(item.timestamp * 1000).toLocaleString('id-ID', {
-            day: '2-digit', month: 'short', year: 'numeric',
-            hour: '2-digit', minute: '2-digit', second: '2-digit'
-          }) + ' WIB',
-          
-          x_velocity_mm_s: roundSafe(item.x_velocity_mm_s),
-          z_velocity_mm_s: roundSafe(item.z_velocity_mm_s),
-          x_peak_accel_g: roundSafe(item.x_peak_accel_g),
-          z_peak_accel_g: roundSafe(item.z_peak_accel_g),
-          temperature: roundSafe(item.temperature)
-        }));
-        
-        setTelemetryData(formattedData);
-        setCurrentPage(1); 
-      }
+      const data = await fetchJsonWithAuth(buildTelemetryUrl('/api/motor/telemetry', appliedRange));
+
+      const roundSafe = (val) => {
+        const parsed = Number(val);
+        return Number.isFinite(parsed) ? Number(parsed.toFixed(2)) : 0;
+      };
+
+      const formattedData = data.map(item => ({
+        ...item,
+        readableTime: new Date(item.timestamp * 1000).toLocaleString('id-ID', {
+          day: '2-digit', month: 'short', year: 'numeric',
+          hour: '2-digit', minute: '2-digit', second: '2-digit'
+        }) + ' WIB',
+
+        x_velocity_mm_s: roundSafe(item.x_velocity_mm_s),
+        z_velocity_mm_s: roundSafe(item.z_velocity_mm_s),
+        x_peak_accel_g: roundSafe(item.x_peak_accel_g),
+        z_peak_accel_g: roundSafe(item.z_peak_accel_g),
+        temperature: roundSafe(item.temperature)
+      }));
+
+      setTelemetryData(formattedData);
+      setCurrentPage(1);
     } catch (error) {
       console.error("Failed to fetch Motor telemetry:", error);
+      setTelemetryData([]);
+      setError(error.message || 'Failed to fetch Motor telemetry.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [appliedRange]);
 
   useEffect(() => {
-    fetchTelemetry();
-  }, []); 
+    const timeoutId = window.setTimeout(() => {
+      void fetchTelemetry();
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [fetchTelemetry]);
 
   const indexOfLastRow = currentPage * rowsPerPage;
   const indexOfFirstRow = indexOfLastRow - rowsPerPage;
   const currentRows = telemetryData.slice(indexOfFirstRow, indexOfLastRow);
   const totalPages = Math.ceil(telemetryData.length / rowsPerPage);
+  const firstVisibleRow = telemetryData.length ? indexOfFirstRow + 1 : 0;
 
   const nextPage = () => setCurrentPage((prev) => (prev < totalPages ? prev + 1 : prev));
   const prevPage = () => setCurrentPage((prev) => (prev > 1 ? prev - 1 : prev));
@@ -98,12 +114,18 @@ const MotorChart = () => {
                   <span className="mx-3 text-slate-400">to</span>
                   <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-transparent border-none outline-none text-slate-700 text-sm font-medium" />
                 </div>
-                <button onClick={fetchTelemetry} className="bg-slate-900 text-white px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-slate-800 transition-colors">
+                <button onClick={() => setAppliedRange({ start: startDate, end: endDate })} className="bg-slate-900 text-white px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-slate-800 transition-colors">
                   Update Range
                 </button>
               </div>
             </div>
           </div>
+
+          {error && (
+            <div className="mb-8 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold text-red-700">
+              Motor telemetry unavailable: {error}
+            </div>
+          )}
 
           {/* Chart Area */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-8">
@@ -114,6 +136,8 @@ const MotorChart = () => {
             <div className="h-[400px] w-full">
               {loading ? (
                 <div className="flex h-full items-center justify-center text-slate-400 font-medium">Loading telemetry...</div>
+              ) : telemetryData.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-slate-400 font-medium">No telemetry rows for this range.</div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={telemetryData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
@@ -139,7 +163,7 @@ const MotorChart = () => {
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
               <h3 className="text-xl font-bold text-slate-900">Raw Motor Logs</h3>
               <span className="text-sm font-medium text-slate-500">
-                Showing {indexOfFirstRow + 1} - {Math.min(indexOfLastRow, telemetryData.length)} of {telemetryData.length} records
+                Showing {firstVisibleRow} - {Math.min(indexOfLastRow, telemetryData.length)} of {telemetryData.length} records
               </span>
             </div>
             <div className="overflow-auto max-h-[500px]">
@@ -155,7 +179,13 @@ const MotorChart = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {currentRows.map((row, index) => (
+                  {currentRows.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="px-6 py-8 text-center font-medium text-slate-400">
+                        No telemetry rows to display.
+                      </td>
+                    </tr>
+                  ) : currentRows.map((row, index) => (
                     <tr key={index} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-6 py-3 font-medium text-slate-900">{row.readableTime}</td>
                       <td className="px-6 py-3 text-slate-600">{row.x_velocity_mm_s}</td>

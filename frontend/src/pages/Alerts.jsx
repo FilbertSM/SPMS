@@ -1,7 +1,192 @@
+import { useEffect, useMemo, useState } from 'react';
+import { fetchJsonWithAuth } from '../utils/api';
+
+const severityStyles = {
+  critical: {
+    border: 'border-[#e74c3c]/20',
+    badge: 'bg-[#e74c3c]/10 text-[#e74c3c]',
+    iconBg: 'bg-[#ffebee] text-[#e74c3c]',
+    score: 'text-[#e74c3c]',
+    bar: 'bg-[#e74c3c]',
+    button: 'btn-danger',
+    label: 'Critical',
+  },
+  warning: {
+    border: 'border-[#2ecc71]/40',
+    badge: 'bg-[#2ecc71]/20 text-[#00743a]',
+    iconBg: 'bg-[#e8f5e9] text-[#00743a]',
+    score: 'text-[#00743a]',
+    bar: 'bg-[#00743a]',
+    button: 'btn-success',
+    label: 'Warning',
+  },
+  normal: {
+    border: 'border-[#c5c6cd]/30',
+    badge: 'bg-[#e0e3e2] text-[#45474d]',
+    iconBg: 'bg-[#f1f4f3] text-[#45474d]',
+    score: 'text-[#45474d]',
+    bar: 'bg-[#75777d]',
+    button: 'btn-secondary',
+    label: 'Normal',
+  },
+};
+
+const formatScore = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed.toFixed(3) : '-';
+};
+
+const formatTimestamp = (timestamp) => {
+  if (!timestamp) return 'No timestamp';
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return 'Invalid timestamp';
+  return date.toLocaleString([], {
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+};
+
+const scorePercent = (alert) => {
+  const score = Number(alert?.reconstruction_error);
+  const threshold = Number(alert?.threshold);
+  if (!Number.isFinite(score) || !Number.isFinite(threshold) || threshold <= 0) return 0;
+  return Math.min(100, Math.max(8, (score / (threshold * 1.5)) * 100));
+};
+
+const AlertCard = ({ alert }) => {
+  const severity = alert?.severity || (alert?.is_anomaly ? 'warning' : 'normal');
+  const styles = severityStyles[severity] || severityStyles.warning;
+
+  return (
+    <div className={`bg-white rounded-lg overflow-hidden flex shadow-sm border ${styles.border}`}>
+      <div className="flex-grow p-5 flex flex-col lg:flex-row items-center gap-6">
+        <div className="flex-shrink-0 w-full lg:w-48">
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-sm ${styles.badge} text-[8px] font-black uppercase tracking-widest mb-2`}>
+            {styles.label}
+          </span>
+          <h3 className="heading-secondary text-lg mb-1">{alert.machine_id || 'PMA Granulator #01'}</h3>
+          <div className="flex items-center gap-2 text-[10px] text-[#45474d] font-medium">
+            <span className="material-symbols-outlined text-[14px]">precision_manufacturing</span>
+            Line B - Pharma
+          </div>
+        </div>
+
+        <div className="flex-grow grid grid-cols-1 md:grid-cols-3 gap-4 w-full lg:border-l lg:border-[#c5c6cd]/30 lg:pl-6">
+          <div className="space-y-1">
+            <p className="text-[9px] font-black uppercase tracking-widest text-[#75777d]">Metric & Variance</p>
+            <div className="flex items-center gap-2">
+              <div className={`w-7 h-7 rounded ${styles.iconBg} flex items-center justify-center`}>
+                <span className="material-symbols-outlined text-base">psychology</span>
+              </div>
+              <div>
+                <p className="text-[11px] font-bold text-[#1b263b]">LSTM Autoencoder</p>
+                <p className={`text-[11px] font-mono font-bold ${styles.score}`}>
+                  Threshold {formatScore(alert.threshold)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <p className="text-[9px] font-black uppercase tracking-widest text-[#75777d]">Temporal Data</p>
+            <div>
+              <p className="text-xs font-bold text-[#1b263b]">{formatTimestamp(alert.timestamp)}</p>
+              <p className="text-[9px] text-[#45474d] font-medium">Backend anomaly event</p>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <p className="text-[9px] font-black uppercase tracking-widest text-[#75777d]">Anomaly Score (MAE)</p>
+            <div className="flex items-end gap-2">
+              <span className={`text-xl font-mono font-bold ${styles.score} leading-none`}>{formatScore(alert.reconstruction_error)}</span>
+              <span className={`text-[8px] font-black ${styles.score} border border-current/20 px-1 py-0.5 rounded-sm mb-0.5`}>
+                {alert.is_anomaly ? 'ACTIVE' : 'LOGGED'}
+              </span>
+            </div>
+            <div className="w-full h-1 bg-[#ebeeed] rounded-full overflow-hidden mt-1">
+              <div className={`${styles.bar} h-full`} style={{ width: `${scorePercent(alert)}%` }}></div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-row lg:flex-col gap-2 w-full lg:w-48 lg:pl-6 lg:border-l lg:border-[#c5c6cd]/30">
+          <button className={`${styles.button} flex-1 lg:w-full`}>
+            Acknowledge
+          </button>
+          <button className="btn-secondary flex-1 lg:w-full py-2 bg-[#e0e3e2] justify-center">
+            Log Ticket
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const EmptyAlertCard = () => (
+  <div className="bg-white rounded-lg overflow-hidden flex shadow-sm border border-[#c5c6cd]/30">
+    <div className="flex-grow p-8 flex flex-col md:flex-row md:items-center gap-5">
+      <div className="w-12 h-12 rounded bg-[#e8f5e9] flex items-center justify-center text-[#00743a]">
+        <span className="material-symbols-outlined">check_circle</span>
+      </div>
+      <div>
+        <span className="inline-flex items-center px-2 py-0.5 rounded-sm bg-[#2ecc71]/20 text-[#00743a] text-[8px] font-black uppercase tracking-widest mb-2">
+          Clear
+        </span>
+        <h3 className="heading-secondary text-lg mb-1">No active backend anomaly events</h3>
+        <p className="text-xs text-[#45474d] font-medium">
+          The FastAPI dashboard summary did not return recent alerts yet. New LSTM Autoencoder events will appear here.
+        </p>
+      </div>
+    </div>
+  </div>
+);
+
 const Alerts = () => {
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadAlerts = async () => {
+      try {
+        setLoading(true);
+        const payload = await fetchJsonWithAuth('/api/dashboard/summary');
+        if (!ignore) {
+          setSummary(payload);
+          setError(null);
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(err.message);
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadAlerts();
+    const timer = window.setInterval(loadAlerts, 60000);
+
+    return () => {
+      ignore = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const alerts = useMemo(() => {
+    const rows = Array.isArray(summary?.recent_alerts) ? summary.recent_alerts : [];
+    return rows.filter((alert) => alert.is_anomaly);
+  }, [summary]);
+
   return (
     <div className="page-container space-y-10">
-      {/* Header Section */}
       <section className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h2 className="heading-primary text-3xl">Active Machine Alerts</h2>
@@ -17,130 +202,30 @@ const Alerts = () => {
         </div>
       </section>
 
-      {/* Active Alerts Grid */}
-      <section className="space-y-4">
-        {/* CRITICAL ALERT ITEM */}
-        <div className="bg-white rounded-lg overflow-hidden flex shadow-sm border border-[#e74c3c]/20">
-          <div className="flex-grow p-5 flex flex-col lg:flex-row items-center gap-6">
-            <div className="flex-shrink-0 w-full lg:w-48">
-              <span className="inline-flex items-center px-2 py-0.5 rounded-sm bg-[#e74c3c]/10 text-[#e74c3c] text-[8px] font-black uppercase tracking-widest mb-2">Critical</span>
-              <h3 className="heading-secondary text-lg mb-1">PMA Granulator #01</h3>
-              <div className="flex items-center gap-2 text-[10px] text-[#45474d] font-medium">
-                <span className="material-symbols-outlined text-[14px]">precision_manufacturing</span>
-                Line B • Pharma
-              </div>
-            </div>
-            
-            <div className="flex-grow grid grid-cols-1 md:grid-cols-3 gap-4 w-full lg:border-l lg:border-[#c5c6cd]/30 lg:pl-6">
-              <div className="space-y-1">
-                <p className="text-[9px] font-black uppercase tracking-widest text-[#75777d]">Metric & Variance</p>
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded bg-[#ffebee] flex items-center justify-center text-[#e74c3c]">
-                    <span className="material-symbols-outlined text-base">vibration</span>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-bold text-[#1b263b]">Vibration Velocity</p>
-                    <p className="text-[11px] font-mono font-bold text-[#e74c3c]">12.4 mm/s <span className="text-[9px] opacity-70">(+84%)</span></p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="space-y-1">
-                <p className="text-[9px] font-black uppercase tracking-widest text-[#75777d]">Temporal Data</p>
-                <div>
-                  <p className="text-xs font-bold text-[#1b263b]">08:14 <span className="text-[9px] font-normal text-[#45474d] uppercase ml-1">Elapsed</span></p>
-                  <p className="text-[9px] text-[#45474d] font-medium">14:22:10 UTC</p>
-                </div>
-              </div>
-              
-              <div className="space-y-1">
-                <p className="text-[9px] font-black uppercase tracking-widest text-[#75777d]">Anomaly Score (MSE)</p>
-                <div className="flex items-end gap-2">
-                  <span className="text-xl font-mono font-bold text-[#e74c3c] leading-none">0.38</span>
-                  <span className="text-[8px] font-black text-[#e74c3c] border border-[#e74c3c]/20 px-1 py-0.5 rounded-sm mb-0.5">PEAK</span>
-                </div>
-                <div className="w-full h-1 bg-[#ebeeed] rounded-full overflow-hidden mt-1">
-                  <div className="bg-[#e74c3c] h-full" style={{ width: '85%' }}></div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex flex-row lg:flex-col gap-2 w-full lg:w-48 lg:pl-6 lg:border-l lg:border-[#c5c6cd]/30">
-              <button className="btn-danger flex-1 lg:w-full">
-                Acknowledge
-              </button>
-              <button className="btn-secondary flex-1 lg:w-full py-2 bg-[#e0e3e2] justify-center">
-                Log Ticket
-              </button>
-            </div>
-          </div>
+      {error && (
+        <div className="bg-[#ffdad6] border border-[#ba1a1a]/20 text-[#ba1a1a] rounded-lg px-4 py-3 text-sm font-bold">
+          Backend data unavailable: {error}
         </div>
+      )}
 
-        {/* WARNING ALERT ITEM */}
-        <div className="bg-white rounded-lg overflow-hidden flex shadow-sm border border-[#2ecc71]/40">
-          <div className="flex-grow p-5 flex flex-col lg:flex-row items-center gap-6">
-            <div className="flex-shrink-0 w-full lg:w-48">
-              <span className="inline-flex items-center px-2 py-0.5 rounded-sm bg-[#2ecc71]/20 text-[#00743a] text-[8px] font-black uppercase tracking-widest mb-2">Warning</span>
-              <h3 className="heading-secondary text-lg mb-1">Blister Packager 04</h3>
-              <div className="flex items-center gap-2 text-[10px] text-[#45474d] font-medium">
-                <span className="material-symbols-outlined text-[14px]">package</span>
-                North Area • Pack
-              </div>
-            </div>
-            
-            <div className="flex-grow grid grid-cols-1 md:grid-cols-3 gap-4 w-full lg:border-l lg:border-[#c5c6cd]/30 lg:pl-6">
-              <div className="space-y-1">
-                <p className="text-[9px] font-black uppercase tracking-widest text-[#75777d]">Metric & Variance</p>
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded bg-[#e8f5e9] flex items-center justify-center text-[#00743a]">
-                    <span className="material-symbols-outlined text-base">bolt</span>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-bold text-[#1b263b]">Motor Current</p>
-                    <p className="text-[11px] font-mono font-bold text-[#00743a]">Threshold Breach</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="space-y-1">
-                <p className="text-[9px] font-black uppercase tracking-widest text-[#75777d]">Temporal Data</p>
-                <div>
-                  <p className="text-xs font-bold text-[#1b263b]">02:45 <span className="text-[9px] font-normal text-[#45474d] uppercase ml-1">Elapsed</span></p>
-                  <p className="text-[9px] text-[#45474d] font-medium">14:28:44 UTC</p>
-                </div>
-              </div>
-              
-              <div className="space-y-1">
-                <p className="text-[9px] font-black uppercase tracking-widest text-[#75777d]">Anomaly Score (MSE)</p>
-                <div className="flex items-end gap-2">
-                  <span className="text-xl font-mono font-bold text-[#00743a] leading-none">0.19</span>
-                  <span className="text-[8px] font-black text-[#00743a] border border-[#00743a]/20 px-1 py-0.5 rounded-sm mb-0.5">ACTIVE</span>
-                </div>
-                <div className="w-full h-1 bg-[#ebeeed] rounded-full overflow-hidden mt-1">
-                  <div className="bg-[#00743a] h-full" style={{ width: '45%' }}></div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex flex-row lg:flex-col gap-2 w-full lg:w-48 lg:pl-6 lg:border-l lg:border-[#c5c6cd]/30">
-              <button className="btn-success flex-1 lg:w-full">
-                Acknowledge
-              </button>
-              <button className="btn-secondary flex-1 lg:w-full py-2 bg-[#e0e3e2] justify-center">
-                Log Ticket
-              </button>
-            </div>
+      <section className="space-y-4">
+        {loading && !summary && (
+          <div className="bg-white rounded-lg p-8 shadow-sm text-sm font-bold text-[#45474d]">
+            Loading backend alerts...
           </div>
-        </div>
+        )}
+        {!loading && alerts.length === 0 && <EmptyAlertCard />}
+        {alerts.map((alert) => (
+          <AlertCard key={alert.id || `${alert.machine_id}-${alert.timestamp}`} alert={alert} />
+        ))}
       </section>
 
-      {/* Historical Log Section */}
       <section className="space-y-6">
         <div className="flex items-center gap-4">
           <h2 className="heading-secondary text-xl">Resolved Alerts & Maintenance Log</h2>
           <div className="h-px flex-grow bg-[#e0e3e2]"></div>
         </div>
-        
+
         <div className="panel-card p-0 overflow-hidden">
           <table className="w-full text-left border-collapse">
             <thead className="bg-[#f4f7f6]">
@@ -165,7 +250,7 @@ const Alerts = () => {
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <p className="text-sm font-medium text-[#1b263b]">Oct 24, 09:12 — 10:45</p>
+                  <p className="text-sm font-medium text-[#1b263b]">Oct 24, 09:12 - 10:45</p>
                   <p className="text-[10px] text-[#45474d] mt-0.5">Total Downtime: 1h 33m</p>
                 </td>
                 <td className="px-6 py-4">
@@ -177,7 +262,7 @@ const Alerts = () => {
                   <button className="text-[#1b263b] hover:text-[#2ecc71] font-bold text-xs uppercase tracking-wider underline decoration-2 underline-offset-4 transition-colors">View Log</button>
                 </td>
               </tr>
-              
+
               <tr className="hover:bg-[#f9fafb] transition-colors">
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
@@ -191,7 +276,7 @@ const Alerts = () => {
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <p className="text-sm font-medium text-[#1b263b]">Oct 23, 14:00 — 14:15</p>
+                  <p className="text-sm font-medium text-[#1b263b]">Oct 23, 14:00 - 14:15</p>
                   <p className="text-[10px] text-[#45474d] mt-0.5">Total Downtime: 15m</p>
                 </td>
                 <td className="px-6 py-4">

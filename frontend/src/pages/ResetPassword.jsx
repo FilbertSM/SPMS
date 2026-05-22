@@ -56,7 +56,7 @@ const ResetPassword = () => {
                 const data = await response.json();
                 setStatus({ type: 'error', message: data.detail || "Failed to reset password. Token may be expired or already used." });
             }
-        } catch (err) {
+        } catch {
             setStatus({ type: 'error', message: "Connection failed. Please try again." });
         } finally {
             setIsLoading(false);

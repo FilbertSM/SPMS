@@ -15,14 +15,14 @@ const Register = () => {
   const [successMsg, setSuccessMsg] = useState(null); 
 
   // --- LIST DOMAIN RESMI YANG DIIZINKAN ---
-  const ALLOWED_DOMAINS = ['sakafarma.com', 'gmail.com', 'ac.id', 'co.id', 'president.ac.id', 'student.president.ac.id'];
+  const ALLOWED_DOMAINS = ['sakafarma.com', 'president.ac.id', 'student.president.ac.id'];
 
   // --- LIVE VALIDATION STATES ---
   const isLengthValid = password.length >= 8 && password.length <= 20;
-  const hasLetter = /[a-zA-Z]/.test(password);
+  const hasUppercase = /[A-Z]/.test(password);
   const hasNumber = /[0-9]/.test(password);
-  const hasSpecial = /[#?!@$%^&*]/.test(password);
-  const isPasswordStrong = isLengthValid && hasLetter && hasNumber && hasSpecial;
+  const hasSpecial = /[^A-Za-z0-9]/.test(password);
+  const isPasswordStrong = isLengthValid && hasUppercase && hasNumber && hasSpecial;
   const isMatching = password === confirmPassword && confirmPassword !== '';
 
   const handleCloseError = () => {
@@ -51,9 +51,9 @@ const Register = () => {
       return false;
     }
 
-    const emailDomain = email.split('@')[1]?.toLowerCase();
+    const emailDomain = email.trim().split('@')[1]?.toLowerCase();
     if (!ALLOWED_DOMAINS.includes(emailDomain)) {
-      setError("Registration is restricted to official company domains only.");
+      setError("Registration is restricted to sakafarma.com, president.ac.id, or student.president.ac.id emails.");
       return false;
     }
 
@@ -83,7 +83,7 @@ const Register = () => {
     try {
       const payload = {
         full_name: fullName, 
-        email: email,
+        email: email.trim().toLowerCase(),
         password: password
       };
 
@@ -186,8 +186,8 @@ const Register = () => {
             {/* COMPANY EMAIL */}
             <div>
               <label className="form-label mb-1.5">Company Email</label>
-              <input 
-                type="type" 
+              <input
+                type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-3 bg-[#f1f4f3] border border-transparent rounded-lg focus:bg-white focus:border-[#1b263b] focus:ring-2 focus:ring-[#1b263b]/10 outline-none transition-all text-[#1b263b] font-medium text-sm"
@@ -222,7 +222,7 @@ const Register = () => {
               {/* LIVE VALIDATION CHECKLIST FOR REGISTER */}
               <div className="space-y-1.5 mt-2.5 px-1">
                 <ValidationItem label="8 characters (20 max)" isValid={isLengthValid} />
-                <ValidationItem label="1 letter, 1 number, 1 special character (# ? ! @)" isValid={hasLetter && hasNumber && hasSpecial} />
+                <ValidationItem label="1 uppercase letter, 1 number, 1 symbol" isValid={hasUppercase && hasNumber && hasSpecial} />
                 <ValidationItem label="Strong password" isValid={isPasswordStrong} />
               </div>
             </div>

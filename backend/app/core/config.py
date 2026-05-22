@@ -27,9 +27,9 @@ class Settings(BaseSettings):
     # Database connection string
     DATABASE_URL: str = "sqlite:///./spms.db"
 
-    MAIL_USERNAME: str
-    MAIL_PASSWORD: str
-    MAIL_FROM: str  # This fixes the "Extra inputs are not permitted" error
+    MAIL_USERNAME: str = "spms@example.com"
+    MAIL_PASSWORD: str = "change-me"
+    MAIL_FROM: str = "spms@example.com"
     MAIL_PORT: int = 587
     MAIL_SERVER: str = "smtp.gmail.com"
     MAIL_FROM_NAME: str = "SPMS Admin"

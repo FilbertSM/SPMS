@@ -130,6 +130,11 @@ cython_debug/
 # Docker
 docker-compose.override.yml
 
+# Local SQLite development databases
+*.db
+*.sqlite
+*.sqlite3
+
 # Machine Learning
 ml_pipeline/data/*.csv
 ml_pipeline/saved_models/*

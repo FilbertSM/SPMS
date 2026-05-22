@@ -19,7 +19,7 @@ const ForgotPasswordModal = ({ isOpen, onClose }) => {
       });
       const data = await response.json();
       setStatus({ type: 'success', message: data.message });
-    } catch (err) {
+    } catch {
       setStatus({ type: 'error', message: 'Connection failed.' });
     } finally {
       setIsLoading(false);

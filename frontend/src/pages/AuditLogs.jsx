@@ -37,11 +37,6 @@ const AuditLogs = () => {
     fetchLogs();
   }, []);
 
-  // --- 2. RESET PAGE SAAT FILTER BERUBAH ---
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, dateFilter]);
-
   // Filter Logic
   const filteredLogs = logs.filter(log => {
     const matchesSearch = log.user_email?.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -123,7 +118,10 @@ const AuditLogs = () => {
             placeholder="Search by User or Action..." 
             className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#c5c6cd]/40 rounded-lg focus:ring-2 focus:ring-[#1b263b]/10 outline-none transition-all text-sm"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
           />
         </div>
         <div className="relative">
@@ -132,7 +130,10 @@ const AuditLogs = () => {
             type="date" 
             className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#c5c6cd]/40 rounded-lg focus:ring-2 focus:ring-[#1b263b]/10 outline-none transition-all text-sm"
             value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
+            onChange={(e) => {
+              setDateFilter(e.target.value);
+              setCurrentPage(1);
+            }}
           />
         </div>
         <button 

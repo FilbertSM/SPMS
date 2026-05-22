@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const TopNav = () => {
@@ -6,6 +6,12 @@ const TopNav = () => {
   const [user, setUser] = useState(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+
+  // 1. Logout Logic
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem('spms_token');
+    navigate('/login');
+  }, [navigate]);
 
   // 1. Fetch User Data on Mount
   useEffect(() => {
@@ -37,7 +43,7 @@ const TopNav = () => {
     };
 
     fetchUserData();
-  }, [navigate]);
+  }, [handleLogout, navigate]);
 
   // 2. Handle click outside to close dropdown
   useEffect(() => {
@@ -49,12 +55,6 @@ const TopNav = () => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  // 3. Logout Logic
-  const handleLogout = () => {
-    localStorage.removeItem('spms_token');
-    navigate('/login');
-  };
 
   return (
     <header className="flex justify-between items-center w-full px-6 py-3 border-b border-[#c5c6cd]/15 bg-[#f7faf9] dark:bg-[#051125] relative z-10">

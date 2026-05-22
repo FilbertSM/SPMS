@@ -22,7 +22,7 @@ const ForgotPassword = () => {
       
       // Even if the email doesn't exist, we show success for security
       setStatus({ type: 'success', message: data.message });
-    } catch (err) {
+    } catch {
       setStatus({ type: 'error', message: 'Connection failed. Please try again.' });
     } finally {
       setIsLoading(false);
