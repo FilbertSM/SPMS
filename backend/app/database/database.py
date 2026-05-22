@@ -13,3 +13,11 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # The base class that all our database models will inherit from
 Base = declarative_base()
+
+# Paste this at the bottom of database.py
+def get_db():
+    db = SessionLocal() # Make sure SessionLocal is defined above in this file!
+    try:
+        yield db
+    finally:
+        db.close()
