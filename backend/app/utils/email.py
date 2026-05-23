@@ -1,4 +1,6 @@
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
+from urllib.parse import urlencode
+
 from app.core.config import settings
 
 conf = ConnectionConfig(
@@ -13,8 +15,10 @@ conf = ConnectionConfig(
 )
 
 async def send_reset_email(email_to: str, token: str):
-    # This URL should point to your React frontend Reset page
-    reset_url = f"http://localhost:3000/reset-password?token={token}"
+    reset_url = (
+        f"{str(settings.FRONTEND_BASE_URL).rstrip('/')}/reset-password?"
+        f"{urlencode({'token': token})}"
+    )
     
     message = MessageSchema(
         subject="SPMS Password Reset Request",

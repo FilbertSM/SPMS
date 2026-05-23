@@ -1,5 +1,8 @@
+import os
 import math
 import unittest
+
+os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 
 from app.main import app
 from app.ml_integration.inference_service import inference_service

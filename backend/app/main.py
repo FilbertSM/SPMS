@@ -1,9 +1,9 @@
 import csv
 import io
 import json
-import re
 from datetime import datetime, timezone
 from typing import Optional
+from urllib.parse import urlencode
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from app import schemas
 from app.core import security
 from app.core.config import settings
-from app.core.security import ALGORITHM, SECRET_KEY
+from app.core.security import ALGORITHM
 from app.database import models
 from app.database.database import SessionLocal, engine
 from app.ml_integration.inference_service import inference_service
@@ -43,12 +43,10 @@ def get_application() -> FastAPI:
         version="1.0.0",
     )
 
+    cors_origins = [str(origin).rstrip("/") for origin in settings.BACKEND_CORS_ORIGINS]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-        ],
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -69,6 +67,29 @@ def get_db():
         db.close()
 
 
+def _record_audit_log(
+    db: Session,
+    *,
+    request: Request,
+    user_email: str | None,
+    action: str,
+    status_value: str,
+):
+    client_ip = request.client.host if request.client else "Unknown"
+    user_agent = request.headers.get("user-agent", "Unknown")
+
+    db.add(
+        models.AuditLog(
+            user_email=user_email,
+            action=action,
+            status=status_value,
+            ip_address=client_ip,
+            browser_info=user_agent,
+        )
+    )
+    db.commit()
+
+
 @app.get("/")
 def health_check():
     return {
@@ -86,7 +107,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     )
 
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
         token_user_id = payload.get("user_id")
         if token_user_id is None:
             raise credentials_exception
@@ -94,7 +115,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         raise credentials_exception
 
     user = db.query(models.User).filter(models.User.id == token_user_id).first()
-    if user is None:
+    if user is None or not user.is_active:
         raise credentials_exception
 
     return user
@@ -128,7 +149,7 @@ def get_current_admin(
 
 
 @app.post("/api/register", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
-def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+def register_user(request: Request, user: schemas.UserCreate, db: Session = Depends(get_db)):
     normalized_email = user.email.strip().lower()
 
     existing_user = db.query(models.User).filter(models.User.email == normalized_email).first()
@@ -146,15 +167,7 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
             detail="Registration is restricted to official company domains only.",
         )
 
-    has_uppercase = re.search(r"[A-Z]", user.password)
-    has_number = re.search(r"[0-9]", user.password)
-    has_symbol = re.search(r"[^A-Za-z0-9]", user.password)
-
-    if len(user.password) < 8 or len(user.password) > 20 or not has_uppercase or not has_number or not has_symbol:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must be at least 8 characters long and contain uppercase letters, numbers, and symbols.",
-        )
+    security.validate_password_policy(user.password)
 
     new_user = models.User(
         full_name=user.full_name,
@@ -165,6 +178,14 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+
+    _record_audit_log(
+        db,
+        request=request,
+        user_email=new_user.email,
+        action="USER_REGISTER",
+        status_value="SUCCESS",
+    )
     return new_user
 
 
@@ -195,6 +216,22 @@ def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid Credentials",
             headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not user.is_active:
+        failed_log = models.AuditLog(
+            user_email=user.email,
+            action="USER_LOGIN",
+            status="FAILED_INACTIVE",
+            ip_address=client_ip,
+            browser_info=user_agent,
+        )
+        db.add(failed_log)
+        db.commit()
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive",
         )
 
     success_log = models.AuditLog(
@@ -270,7 +307,10 @@ async def forgot_password(
         )
 
         reset_token = security.create_reset_token(data={"sub": user.email})
-        reset_link = f"http://localhost:5173/reset-password?token={reset_token}"
+        reset_link = (
+            f"{str(settings.FRONTEND_BASE_URL).rstrip('/')}/reset-password?"
+            f"{urlencode({'token': reset_token})}"
+        )
 
         message = MessageSchema(
             subject="SPMS - Password Reset Request",
@@ -325,7 +365,7 @@ def reset_password(
     user_agent = request.headers.get("user-agent", "Unknown")
 
     try:
-        payload = jwt.decode(data.token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(data.token, settings.SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
         scope: str = payload.get("scope")
 
@@ -338,6 +378,7 @@ def reset_password(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    security.validate_password_policy(data.new_password)
     user.hashed_password = security.get_password_hash(data.new_password)
 
     reset_log = models.AuditLog(
@@ -677,8 +718,35 @@ def read_latest_telemetry(
     return _latest_telemetry_rows(db, machine_id=machine_id, limit=safe_limit)
 
 
+@app.get("/api/alerts", response_model=list[schemas.AlertResponse])
+def read_alerts(
+    request: Request,
+    machine_id: str = "PMA Granulator #01",
+    limit: int = 50,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _record_audit_log(
+        db,
+        request=request,
+        user_email=current_user.email,
+        action="ALERTS_VIEW",
+        status_value="SUCCESS",
+    )
+
+    safe_limit = max(1, min(limit, 200))
+    return (
+        db.query(models.AnomalyEvent)
+        .filter(models.AnomalyEvent.machine_id == machine_id)
+        .order_by(models.AnomalyEvent.timestamp.desc())
+        .limit(safe_limit)
+        .all()
+    )
+
+
 @app.post("/api/predict/anomaly", response_model=schemas.AnomalyPredictionResponse)
 def predict_anomaly(
+    http_request: Request,
     request: schemas.AnomalyPredictionRequest,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -708,6 +776,13 @@ def predict_anomaly(
         window_start=window[0]["timestamp"],
         window_end=window[-1]["timestamp"],
     )
+    _record_audit_log(
+        db,
+        request=http_request,
+        user_email=current_user.email,
+        action="ANOMALY_PREDICTION_MANUAL",
+        status_value="SUCCESS",
+    )
 
     return _prediction_response(
         machine_id=request.machine_id,
@@ -721,6 +796,7 @@ def predict_anomaly(
 
 @app.post("/api/predict/anomaly/latest", response_model=schemas.AnomalyPredictionResponse)
 def predict_latest_anomaly(
+    request: Request,
     machine_id: str = "PMA Granulator #01",
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -753,6 +829,13 @@ def predict_latest_anomaly(
         window_start=window_payload["window_start"],
         window_end=window_payload["window_end"],
     )
+    _record_audit_log(
+        db,
+        request=request,
+        user_email=current_user.email,
+        action="ANOMALY_PREDICTION_LATEST",
+        status_value="SUCCESS",
+    )
 
     return _prediction_response(
         machine_id=machine_id,
@@ -766,10 +849,19 @@ def predict_latest_anomaly(
 
 @app.get("/api/dashboard/summary", response_model=schemas.DashboardSummary)
 def read_dashboard_summary(
+    request: Request,
     machine_id: str = "PMA Granulator #01",
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    _record_audit_log(
+        db,
+        request=request,
+        user_email=current_user.email,
+        action="DASHBOARD_SUMMARY_VIEW",
+        status_value="SUCCESS",
+    )
+
     latest_rows = _latest_telemetry_rows(db, machine_id=machine_id, limit=1)
     latest_reading = latest_rows[0] if latest_rows else None
     latest_prediction = (

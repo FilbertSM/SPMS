@@ -14,6 +14,7 @@ class UserResponse(BaseModel): # <--- This must match exactly
     email: str
     role: str
     is_active: bool
+    email_notifications: bool
 
     class Config:
         from_attributes = True

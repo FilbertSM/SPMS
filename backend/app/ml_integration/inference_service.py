@@ -1,6 +1,8 @@
 import json
 import math
 import os
+import tempfile
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -106,12 +108,78 @@ class InferenceService:
         if self._scaler is None:
             import joblib
 
-            self._scaler = joblib.load(SCALER_PATH)
+            try:
+                self._scaler = joblib.load(SCALER_PATH)
+            except Exception as exc:
+                raise RuntimeError(f"ML scaler artifact could not be loaded: {exc}") from exc
 
         if self._model is None:
             from tensorflow import keras
 
-            self._model = keras.models.load_model(MODEL_PATH, compile=False)
+            try:
+                self._model = keras.models.load_model(MODEL_PATH, compile=False)
+            except Exception as exc:
+                try:
+                    self._model = self._load_rebuild_autoencoder_from_packaged_weights()
+                except Exception as fallback_exc:
+                    raise RuntimeError(
+                        f"ML model artifact could not be loaded: {fallback_exc}"
+                    ) from exc
+
+    def _load_rebuild_autoencoder_from_packaged_weights(self):
+        import h5py
+        from tensorflow import keras
+
+        feature_count = len(self.feature_names())
+        expected_window = self.window_size()
+
+        inputs = keras.layers.Input(shape=(expected_window, feature_count), name="sensor_window")
+        x = keras.layers.LSTM(64, return_sequences=True, name="encoder_lstm_64")(inputs)
+        x = keras.layers.LSTM(32, return_sequences=False, name="encoder_lstm_32")(x)
+        x = keras.layers.RepeatVector(expected_window, name="repeat_latent")(x)
+        x = keras.layers.LSTM(32, return_sequences=True, name="decoder_lstm_32")(x)
+        x = keras.layers.LSTM(64, return_sequences=True, name="decoder_lstm_64")(x)
+        outputs = keras.layers.TimeDistributed(
+            keras.layers.Dense(feature_count),
+            name="reconstruction",
+        )(x)
+        model = keras.Model(inputs, outputs, name="spms_lstm_autoencoder_rebuild")
+
+        with zipfile.ZipFile(MODEL_PATH) as archive:
+            with tempfile.NamedTemporaryFile(suffix=".weights.h5", delete=False) as weights_file:
+                weights_file.write(archive.read("model.weights.h5"))
+                weights_path = weights_file.name
+
+        try:
+            with h5py.File(weights_path, "r") as weights:
+                layer_pairs = [
+                    ("lstm", "encoder_lstm_64"),
+                    ("lstm_1", "encoder_lstm_32"),
+                    ("lstm_2", "decoder_lstm_32"),
+                    ("lstm_3", "decoder_lstm_64"),
+                ]
+                for artifact_layer, model_layer in layer_pairs:
+                    vars_group = self._h5_vars_group(weights, f"layers\\{artifact_layer}\\cell")
+                    model.get_layer(model_layer).set_weights(
+                        [vars_group[str(index)][()] for index in range(3)]
+                    )
+
+                dense_vars = self._h5_vars_group(weights, "layers\\time_distributed\\layer")
+                model.get_layer("reconstruction").layer.set_weights(
+                    [dense_vars["0"][()], dense_vars["1"][()]]
+                )
+        finally:
+            os.unlink(weights_path)
+
+        return model
+
+    @staticmethod
+    def _h5_vars_group(weights: Any, key: str):
+        candidates = [key, key.replace("\\", "/")]
+        for candidate in candidates:
+            if candidate in weights:
+                return weights[candidate]["vars"]
+        raise RuntimeError(f"Expected model weight group is missing: {key}")
 
     def predict_window(self, rows: list[dict[str, Any]]) -> dict[str, Any]:
         import numpy as np
