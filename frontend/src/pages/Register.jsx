@@ -140,7 +140,7 @@ const Register = () => {
           </div>
           <h2 className="text-3xl font-black font-headline mb-4 leading-tight">Strict Access Control</h2>
           <p className="text-[#c5c6cd] text-sm leading-relaxed mb-8">
-            Registration requires administrator approval. All access logs are tracked via Role-Based Access Control (RBAC).
+            Registration is restricted to approved capstone domains. Role-based access is enforced by the backend after sign-in.
           </p>
         </div>
       </div>
@@ -257,7 +257,7 @@ const Register = () => {
           </form>
 
           <p className="mt-6 text-center text-xs text-[#45474d]">
-            Already approved? <Link to="/login" className="font-bold text-[#1b263b] hover:text-[#2ecc71] transition-colors">Sign In Here</Link>
+            Already have an account? <Link to="/login" className="font-bold text-[#1b263b] hover:text-[#2ecc71] transition-colors">Sign In Here</Link>
           </p>
         </div>
       </div>

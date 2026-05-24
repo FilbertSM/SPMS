@@ -17,10 +17,10 @@ const ResetPassword = () => {
 
     // --- LIVE VALIDATION STATES (Sama seperti Register) ---
     const isLengthValid = newPassword.length >= 8 && newPassword.length <= 20;
-    const hasLetter = /[a-zA-Z]/.test(newPassword);
+    const hasUppercase = /[A-Z]/.test(newPassword);
     const hasNumber = /[0-9]/.test(newPassword);
-    const hasSpecial = /[#?!@$%^&*]/.test(newPassword);
-    const isPasswordStrong = isLengthValid && hasLetter && hasNumber && hasSpecial;
+    const hasSpecial = /[^A-Za-z0-9]/.test(newPassword);
+    const isPasswordStrong = isLengthValid && hasUppercase && hasNumber && hasSpecial;
     const isMatching = newPassword === confirmPassword && confirmPassword !== '';
 
     const handleSubmit = async (e) => {
@@ -100,7 +100,7 @@ const ResetPassword = () => {
                         {/* LIVE VALIDATION CHECKLIST (Sesuai gambar image_c8adab.jpg) */}
                         <div className="space-y-1.5 mt-2.5 px-1">
                             <ValidationItem label="8 characters (20 max)" isValid={isLengthValid} />
-                            <ValidationItem label="1 letter, 1 number, 1 special character (# ? ! @)" isValid={hasLetter && hasNumber && hasSpecial} />
+                            <ValidationItem label="1 uppercase letter, 1 number, 1 symbol" isValid={hasUppercase && hasNumber && hasSpecial} />
                             <ValidationItem label="Strong password" isValid={isPasswordStrong} />
                         </div>
                     </div>

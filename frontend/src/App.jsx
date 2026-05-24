@@ -1,19 +1,30 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
-import Dashboard from './pages/Dashboard';
-import Alerts from './pages/Alerts';
-import Settings from './pages/Settings';
 import Login from './pages/Login';       
 import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
 import ProtectedRoute from './components/Routes'; 
 import ForgotPassword from './pages/ForgotPassword';
-import Profile from './pages/Profile';
-import PmaDashboard from './pages/PMAChart';
-import MotorChart from './pages/VibrationChart';
 
-// Import halaman baru yang tadi kita buat
-import AuditLogs from './pages/AuditLogs';
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Alerts = lazy(() => import('./pages/Alerts'));
+const AuditLogs = lazy(() => import('./pages/AuditLogs'));
+const Settings = lazy(() => import('./pages/Settings'));
+const Profile = lazy(() => import('./pages/Profile'));
+const PmaDashboard = lazy(() => import('./pages/PMAChart'));
+const MotorChart = lazy(() => import('./pages/VibrationChart'));
+const Support = lazy(() => import('./pages/Support'));
+const SystemStatus = lazy(() => import('./pages/SystemStatus'));
+
+const PageFallback = () => (
+  <div className="page-container flex items-center justify-center">
+    <div className="flex items-center gap-3 text-sm font-bold text-[#45474d]">
+      <span className="material-symbols-outlined animate-spin">sync</span>
+      Loading page...
+    </div>
+  </div>
+);
 
 function App() {
   return (
@@ -34,15 +45,18 @@ function App() {
 
           {/* Internal Routes - PROTECTED */}
           <Route path="/app" element={<Layout />}>
-            <Route index element={<Dashboard />} /> 
-            <Route path="alerts" element={<Alerts />} />            
-            <Route path="audit" element={<AuditLogs />} />
-            <Route path="settings" element={<Settings />} />
-            <Route path="profile" element={<Profile />} />
-            <Route path="pma" element={<PmaDashboard />} />
-            <Route path="vibration" element={<MotorChart />} />
-            <Route path="support" element={<div className="p-8 bg-[#f1f4f3] flex-1"><h1 className="text-2xl font-bold font-headline">Support Center</h1></div>} />
-            <Route path="status" element={<div className="p-8 bg-[#f1f4f3] flex-1"><h1 className="text-2xl font-bold font-headline">System Status</h1></div>} />
+            <Route
+              index
+              element={<Suspense fallback={<PageFallback />}><Dashboard /></Suspense>}
+            />
+            <Route path="alerts" element={<Suspense fallback={<PageFallback />}><Alerts /></Suspense>} />
+            <Route path="audit" element={<Suspense fallback={<PageFallback />}><AuditLogs /></Suspense>} />
+            <Route path="settings" element={<Suspense fallback={<PageFallback />}><Settings /></Suspense>} />
+            <Route path="profile" element={<Suspense fallback={<PageFallback />}><Profile /></Suspense>} />
+            <Route path="pma" element={<Suspense fallback={<PageFallback />}><PmaDashboard /></Suspense>} />
+            <Route path="vibration" element={<Suspense fallback={<PageFallback />}><MotorChart /></Suspense>} />
+            <Route path="support" element={<Suspense fallback={<PageFallback />}><Support /></Suspense>} />
+            <Route path="status" element={<Suspense fallback={<PageFallback />}><SystemStatus /></Suspense>} />
           </Route>
         </Route>
 

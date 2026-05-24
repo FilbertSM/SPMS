@@ -5,6 +5,8 @@ const Profile = () => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [preferenceStatus, setPreferenceStatus] = useState(null);
+  const [isSavingPreference, setIsSavingPreference] = useState(false);
 
   useEffect(() => {
     let ignore = false;
@@ -33,6 +35,30 @@ const Profile = () => {
       ignore = true;
     };
   }, []);
+
+  const handleToggleNotifications = async () => {
+    if (!user) return;
+
+    const nextValue = !user.email_notifications;
+    setIsSavingPreference(true);
+    setPreferenceStatus(null);
+
+    try {
+      const payload = await fetchJsonWithAuth('/api/users/me/preferences', {
+        method: 'PATCH',
+        body: JSON.stringify({ email_notifications: nextValue }),
+      });
+      setUser((current) => ({
+        ...current,
+        email_notifications: Boolean(payload.email_notifications),
+      }));
+      setPreferenceStatus({ type: 'success', message: 'Preference saved to backend.' });
+    } catch (err) {
+      setPreferenceStatus({ type: 'error', message: err.message });
+    } finally {
+      setIsSavingPreference(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -104,16 +130,26 @@ const Profile = () => {
               <div>
                 <p className="text-sm font-bold text-white">Email Notifications</p>
                 <p className="text-xs text-[#c5c6cd] mt-1">
-                  Disabled in this demo because the current profile response does not expose an email notification field.
+                  Stored by the backend as <span className="font-bold">email_notifications</span> on your account.
                 </p>
+                {preferenceStatus && (
+                  <p className={`text-xs font-bold mt-2 ${preferenceStatus.type === 'success' ? 'text-[#6bfe9c]' : 'text-[#ffdad6]'}`}>
+                    {preferenceStatus.message}
+                  </p>
+                )}
               </div>
               <button
                 type="button"
-                disabled
-                className="w-12 h-6 rounded-full bg-[#45474d] cursor-not-allowed relative flex items-center opacity-70"
-                title="Backend field unavailable in UserResponse"
+                onClick={handleToggleNotifications}
+                disabled={isSavingPreference}
+                className={`w-12 h-6 rounded-full relative flex items-center transition-colors disabled:opacity-60 ${
+                  user?.email_notifications ? 'bg-[#2ecc71]' : 'bg-[#45474d]'
+                }`}
+                title="Toggle email notifications"
               >
-                <div className="w-4 h-4 bg-white rounded-full absolute translate-x-1"></div>
+                <div className={`w-4 h-4 bg-white rounded-full absolute transition-transform ${
+                  user?.email_notifications ? 'translate-x-7' : 'translate-x-1'
+                }`}></div>
               </button>
             </div>
           </div>

@@ -120,11 +120,11 @@ const Login = () => {
           </div>
           <h2 className="text-5xl font-black font-headline mb-6 leading-tight">Secure Predictive Maintenance System</h2>
           <p className="text-[#c5c6cd] text-lg leading-relaxed mb-8">
-            Enterprise-grade monitoring and anomaly detection for PMA Granulator and critical assets.
+            Secure predictive monitoring and anomaly detection for PMA Granulator data.
           </p>
           <div className="flex items-center gap-2 text-sm font-bold text-[#2ecc71] uppercase tracking-widest font-label">
             <span className="w-2 h-2 rounded-full bg-[#2ecc71] animate-pulse"></span>
-            System Online • AES-256 Encrypted
+            Authenticated backend access
           </div>
         </div>
       </div>

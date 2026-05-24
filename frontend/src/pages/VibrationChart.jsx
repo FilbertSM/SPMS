@@ -3,12 +3,6 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { Calendar, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
 import { fetchJsonWithAuth } from '../utils/api';
 
-const dateInputValueFromToday = (offsetDays = 0) => {
-  const date = new Date();
-  date.setDate(date.getDate() + offsetDays);
-  return date.toISOString().split('T')[0];
-};
-
 const buildTelemetryUrl = (baseUrl, range) => {
   if (!range?.start || !range?.end) return baseUrl;
   const params = new URLSearchParams({ start: range.start, end: range.end });
@@ -20,8 +14,8 @@ const MotorChart = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
-  const [startDate, setStartDate] = useState(() => dateInputValueFromToday(-1));
-  const [endDate, setEndDate] = useState(() => dateInputValueFromToday());
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [appliedRange, setAppliedRange] = useState(null);
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -83,23 +77,38 @@ const MotorChart = () => {
     <div className="page-container font-sans text-slate-800">
           
           {/* Header Area */}
-          <div className="flex justify-between items-start mb-8 gap-6">
+          <div className="flex flex-col lg:flex-row justify-between items-start mb-8 gap-6">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex-1">
               <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Motor #1.1 Diagnostics</h1>
               <p className="text-slate-500 mt-2">
                 Vibration and thermal monitoring for maintenance review. This page reports anomaly signals only and does not control the machine.
               </p>
               
-              <div className="flex items-center gap-4 mt-6">
-                <div className="flex items-center bg-gray-50 border border-gray-200 rounded-lg p-2">
+              <p className="text-xs font-semibold text-slate-500 mt-4">
+                First load shows latest imported Docker motor data. Use the optional range only when you know the imported dataset dates.
+              </p>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 mt-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg p-2">
                   <Calendar className="w-5 h-5 text-slate-400 ml-2 mr-3" />
                   <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-transparent border-none outline-none text-slate-700 text-sm font-medium" />
                   <span className="mx-3 text-slate-400">to</span>
                   <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-transparent border-none outline-none text-slate-700 text-sm font-medium" />
                 </div>
-                <button onClick={() => setAppliedRange({ start: startDate, end: endDate })} className="bg-slate-900 text-white px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-slate-800 transition-colors">
-                  Update Range
+                <button onClick={() => setAppliedRange(startDate && endDate ? { start: startDate, end: endDate } : null)} className="bg-slate-900 text-white px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-slate-800 transition-colors">
+                  {startDate && endDate ? 'Apply Range' : 'Show Latest'}
                 </button>
+                {appliedRange && (
+                  <button
+                    onClick={() => {
+                      setStartDate('');
+                      setEndDate('');
+                      setAppliedRange(null);
+                    }}
+                    className="bg-white text-slate-700 border border-gray-200 px-4 py-2.5 rounded-lg text-sm font-bold hover:bg-gray-50 transition-colors"
+                  >
+                    Clear Range
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -143,14 +152,14 @@ const MotorChart = () => {
 
           {/* Data Table */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+            <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
               <h3 className="text-xl font-bold text-slate-900">Raw Motor Logs</h3>
               <span className="text-sm font-medium text-slate-500">
                 Showing {firstVisibleRow} - {Math.min(indexOfLastRow, telemetryData.length)} of {telemetryData.length} records
               </span>
             </div>
             <div className="overflow-auto max-h-[500px]">
-              <table className="w-full text-sm text-left relative">
+              <table className="min-w-[860px] w-full text-sm text-left relative">
                 <thead className="bg-slate-50 text-slate-500 font-medium border-b border-gray-100 sticky top-0 z-10">
                   <tr>
                     <th className="px-6 py-4">Timestamp (WIB)</th>
