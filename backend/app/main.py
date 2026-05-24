@@ -14,6 +14,12 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+# --- USER IMPORTS RESTORED ---
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
+
 from app import schemas
 from app.core import security
 from app.core.config import settings
@@ -28,10 +34,30 @@ from app.ml_integration.window_builder import (
     fetch_latest_pma_l1_rows,
     validate_prediction_window,
 )
+import random
+from datetime import timedelta
+
+# --- INISIALISATION LIMITER ---
+limiter = Limiter(key_func=get_remote_address)
+
+# --- CONFIGURATION EMAIL ---
+conf = ConnectionConfig(
+    MAIL_USERNAME = "jason_a@smaknasionalanglo.sch.id",
+    MAIL_PASSWORD = "dpxfvzcuqlvncbmv",
+    MAIL_FROM = "jason_a@smaknasionalanglo.sch.id",
+    MAIL_PORT = 587,
+    MAIL_SERVER = "smtp.gmail.com",
+    MAIL_STARTTLS = True,
+    MAIL_SSL_TLS = False,
+    USE_CREDENTIALS = True,
+    VALIDATE_CERTS = True
+)
 
 
 def get_application() -> FastAPI:
+    # print("--- ⚠️ RESET DATABASE SEMENTARA ⚠️ ---")
     try:
+        # models.Base.metadata.drop_all(bind=engine)
         models.Base.metadata.create_all(bind=engine)
     except SQLAlchemyError as exc:
         print(f"WARNING: database table initialization skipped: {exc}")
@@ -42,6 +68,10 @@ def get_application() -> FastAPI:
         description="Secure Predictive Maintenance System API",
         version="1.0.0",
     )
+
+    # --- ADD A STATE & EXCEPTION HANDLER LIMITER TO THE APP ---
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     app.add_middleware(
         CORSMiddleware,
@@ -128,47 +158,95 @@ def get_current_admin(
 
 
 @app.post("/api/register", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
-def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+def register_user(request: Request, user: schemas.UserCreate, db: Session = Depends(get_db)):
     normalized_email = user.email.strip().lower()
+    
+    # Menangkap IP Address dan User Agent untuk keperluan audit
+    client_ip = request.client.host if request.client else "Unknown"
+    user_agent = request.headers.get("user-agent", "Unknown")
 
+    # 1. Gagal karena Email Sudah Terdaftar
     existing_user = db.query(models.User).filter(models.User.email == normalized_email).first()
     if existing_user:
+        failed_log = models.AuditLog(
+            user_email=normalized_email,
+            action="USER_REGISTRATION",
+            status="FAILED",
+            ip_address=client_ip,
+            browser_info=user_agent
+        )
+        db.add(failed_log)
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered",
         )
 
-    allowed_domains = ["sakafarma.com", "president.ac.id", "student.president.ac.id"]
+    # 2. Gagal karena Domain Tidak Diizinkan
+    allowed_domains = ["sakafarma.com", "gmail.com", "president.ac.id", "student.president.ac.id"]
     email_domain = normalized_email.split("@")[-1] if "@" in normalized_email else ""
     if email_domain not in allowed_domains:
+        failed_log = models.AuditLog(
+            user_email=normalized_email,
+            action="USER_REGISTRATION",
+            status="FAILED",
+            ip_address=client_ip,
+            browser_info=user_agent
+        )
+        db.add(failed_log)
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Registration is restricted to official company domains only.",
         )
 
+    # 3. Gagal karena Kompleksitas Password Kurang
     has_uppercase = re.search(r"[A-Z]", user.password)
     has_number = re.search(r"[0-9]", user.password)
     has_symbol = re.search(r"[^A-Za-z0-9]", user.password)
 
     if len(user.password) < 8 or len(user.password) > 20 or not has_uppercase or not has_number or not has_symbol:
+        failed_log = models.AuditLog(
+            user_email=normalized_email,
+            action="USER_REGISTRATION",
+            status="FAILED",
+            ip_address=client_ip,
+            browser_info=user_agent
+        )
+        db.add(failed_log)
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Password must be at least 8 characters long and contain uppercase letters, numbers, and symbols.",
         )
 
+    print(f"--- DEBUG: Security validation passed for user: {normalized_email} ---")
+
+    # Proses simpan data pengguna baru
     new_user = models.User(
         full_name=user.full_name,
         email=normalized_email,
         hashed_password=security.get_password_hash(user.password),
     )
-
     db.add(new_user)
+    
+    # 4. Sukses Registrasi (Catat log status SUCCESS)
+    success_log = models.AuditLog(
+        user_email=normalized_email,
+        action="USER_REGISTRATION",
+        status="SUCCESS",
+        ip_address=client_ip,
+        browser_info=user_agent
+    )
+    db.add(success_log)
+    
     db.commit()
     db.refresh(new_user)
     return new_user
 
 
 @app.post("/api/login", response_model=schemas.Token)
+@limiter.limit("5/minute")
 def login(
     request: Request,
     user_credentials: OAuth2PasswordRequestForm = Depends(),
@@ -248,42 +326,29 @@ async def forgot_password(
     user = db.query(models.User).filter(models.User.email == normalized_email).first()
 
     if user:
-        try:
-            from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
-        except ImportError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"Email runtime dependency is missing: {exc}",
-            ) from exc
-
-        conf = ConnectionConfig(
-            MAIL_USERNAME=settings.MAIL_USERNAME,
-            MAIL_PASSWORD=settings.MAIL_PASSWORD,
-            MAIL_FROM=settings.MAIL_FROM,
-            MAIL_FROM_NAME=settings.MAIL_FROM_NAME,
-            MAIL_PORT=settings.MAIL_PORT,
-            MAIL_SERVER=settings.MAIL_SERVER,
-            MAIL_STARTTLS=True,
-            MAIL_SSL_TLS=False,
-            USE_CREDENTIALS=True,
-            VALIDATE_CERTS=True,
-        )
-
-        reset_token = security.create_reset_token(data={"sub": user.email})
-        reset_link = f"http://localhost:5173/reset-password?token={reset_token}"
+        # --- GENERATE 6-DIGIT OTP ---
+        otp_code = str(random.randint(100000, 999999))
+        
+        # Simpan OTP dan waktu kedaluwarsa (15 menit dari sekarang) ke database
+        user.reset_otp = otp_code
+        user.reset_otp_expire = datetime.utcnow() + timedelta(minutes=15)
+        db.commit()
 
         message = MessageSchema(
-            subject="SPMS - Password Reset Request",
+            subject="SPMS - Your Password Reset OTP",
             recipients=[user.email],
             body=f"""
-            <div style="font-family: Arial, sans-serif; max-width: 500px; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px; color: #1b263b;">
-                <h3 style="font-size: 20px; font-weight: bold; margin-bottom: 8px;">Reset Your SPMS Password</h3>
-                <p style="font-size: 14px; color: #45474d; margin-bottom: 16px;">You requested a password reset for your account.</p>
-                <p style="font-size: 14px; color: #45474d; margin-bottom: 24px;">Click the button below to set a new password. This link expires in 15 minutes.</p>
-                <a href="{reset_link}" style="display: inline-block; padding: 12px 24px; background-color: #1b263b; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; text-transform: uppercase;">Reset Password</a>
-                <p style="font-size: 11px; color: #777; margin-top: 28px; line-height: 1.5;">
-                    If the button above does not work, copy and paste this URL into your browser:<br>
-                    <a href="{reset_link}" style="color: #2ecc71;">{reset_link}</a>
+            <div style="font-family: Arial, sans-serif; max-width: 500px; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px; color: #1b263b; text-align: center;">
+                <h3 style="font-size: 20px; font-weight: bold; margin-bottom: 8px;">Password Reset Request</h3>
+                <p style="font-size: 14px; color: #45474d; margin-bottom: 24px;">You requested a password reset for your SPMS account. Please use the verification code below:</p>
+                
+                <div style="background-color: #f1f4f3; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+                    <span style="font-size: 32px; font-weight: black; letter-spacing: 8px; color: #2ecc71;">{otp_code}</span>
+                </div>
+                
+                <p style="font-size: 12px; color: #777; line-height: 1.5;">
+                    This code will expire in 15 minutes.<br>
+                    If you did not request this, please ignore this email and your password will remain unchanged.
                 </p>
             </div>
             """,
@@ -295,7 +360,7 @@ async def forgot_password(
 
         log = models.AuditLog(
             user_email=user.email,
-            action="PASSWORD_RESET_REQ",
+            action="OTP_SENT",
             status="SUCCESS",
             ip_address=client_ip,
             browser_info=user_agent,
@@ -303,7 +368,7 @@ async def forgot_password(
     else:
         log = models.AuditLog(
             user_email=normalized_email,
-            action="PASSWORD_RESET_REQ",
+            action="OTP_REQ_FAILED",
             status="FAILED",
             ip_address=client_ip,
             browser_info=user_agent,
@@ -312,34 +377,40 @@ async def forgot_password(
     db.add(log)
     db.commit()
 
-    return {"message": "If this email is registered, a reset link has been sent."}
+    return {"message": "If this email is registered, an OTP code has been sent."}
 
 
 @app.post("/api/reset-password")
 def reset_password(
     request: Request,
-    data: schemas.ResetPassword,
+    data: schemas.ResetPassword, # Ini otomatis akan membaca email, otp, dan new_password dari schemas.py
     db: Session = Depends(get_db),
 ):
     client_ip = request.client.host if request.client else "Unknown"
     user_agent = request.headers.get("user-agent", "Unknown")
+    normalized_email = data.email.strip().lower()
 
-    try:
-        payload = jwt.decode(data.token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        scope: str = payload.get("scope")
-
-        if not email or scope != "password_reset":
-            raise HTTPException(status_code=401, detail="Token expired or invalid")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Token expired or invalid")
-
-    user = db.query(models.User).filter(models.User.email == email).first()
+    # Cari user berdasarkan email
+    user = db.query(models.User).filter(models.User.email == normalized_email).first()
+    
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    user.hashed_password = security.get_password_hash(data.new_password)
+    # --- VALIDASI OTP ---
+    if user.reset_otp != data.otp:
+        raise HTTPException(status_code=400, detail="Invalid OTP code.")
+    
+    # --- VALIDASI WAKTU KEDALUWARSA ---
+    if user.reset_otp_expire is None or datetime.utcnow() > user.reset_otp_expire:
+        raise HTTPException(status_code=400, detail="OTP code has expired. Please request a new one.")
 
+    # Jika lolos validasi, update password
+    user.hashed_password = security.get_password_hash(data.new_password)
+    
+    # Hapus OTP dari database agar tidak bisa dipakai ulang
+    user.reset_otp = None
+    user.reset_otp_expire = None
+    
     reset_log = models.AuditLog(
         user_email=user.email,
         action="PASSWORD_RESET_SUCCESS",
@@ -424,6 +495,10 @@ def update_user_preferences(
         "email_notifications": current_user.email_notifications,
     }
 
+
+# ==========================================
+# --- TEAMMATE ML & TELEMETRY ENDPOINTS ---
+# ==========================================
 
 @app.get("/api/pma/getPMAData")
 def get_pma_telemetry(

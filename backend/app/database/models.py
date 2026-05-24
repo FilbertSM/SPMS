@@ -13,6 +13,8 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     email_notifications = Column(Boolean, default=True)
+    reset_otp = Column(String(6), nullable=True) 
+    reset_otp_expire = Column(DateTime(timezone=True), nullable=True)
 
 class AuditLog(Base):
     """

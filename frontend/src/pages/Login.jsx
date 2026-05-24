@@ -44,7 +44,7 @@ const Login = () => {
       formData.append('username', email);
       formData.append('password', password);
 
-      const data = await postForm('/api/login', formData);
+      const data = await postForm('http://127.0.0.1:8000/api/login', formData);
       localStorage.setItem('spms_token', data.access_token);
       
       // Handle Remember Me storage

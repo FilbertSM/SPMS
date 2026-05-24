@@ -16,7 +16,7 @@ const Register = () => {
   const [successMsg, setSuccessMsg] = useState(null); 
 
   // --- LIST DOMAIN RESMI YANG DIIZINKAN ---
-  const ALLOWED_DOMAINS = ['sakafarma.com', 'president.ac.id', 'student.president.ac.id'];
+  const ALLOWED_DOMAINS = ['sakafarma.com', 'gmail.com', 'president.ac.id', 'student.president.ac.id'];
 
   // --- LIVE VALIDATION STATES ---
   const isLengthValid = password.length >= 8 && password.length <= 20;
@@ -54,7 +54,7 @@ const Register = () => {
 
     const emailDomain = email.trim().split('@')[1]?.toLowerCase();
     if (!ALLOWED_DOMAINS.includes(emailDomain)) {
-      setError("Registration is restricted to sakafarma.com, president.ac.id, or student.president.ac.id emails.");
+      setError("Registration is restricted to sakafarma.com, gmail.com, president.ac.id, or student.president.ac.id emails.");
       return false;
     }
 
@@ -85,7 +85,7 @@ const Register = () => {
       const payload = {
         full_name: fullName, 
         email: email.trim().toLowerCase(),
-        password: password
+        password: password.trim()
       };
 
       await fetchJson('/api/register', {

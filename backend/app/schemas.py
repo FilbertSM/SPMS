@@ -23,7 +23,8 @@ class Token(BaseModel):
     token_type: str
 
 class ResetPassword(BaseModel):
-    token: str
+    email: str
+    otp: str
     new_password: str
 
 class ForgotPasswordRequest(BaseModel):
