@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import Form4Warning from '../components/Form4Warning';
 import { fetchJsonWithAuth } from '../utils/api';
 
 const severityStyles = {
@@ -94,7 +95,9 @@ const AlertCard = ({ alert }) => {
             <p className="text-[9px] font-black uppercase tracking-widest text-[#75777d]">Temporal Data</p>
             <div>
               <p className="text-xs font-bold text-[#1b263b]">{formatTimestamp(alert.timestamp)}</p>
-              <p className="text-[9px] text-[#45474d] font-medium">Backend anomaly event</p>
+              <p className="text-[9px] text-[#45474d] font-medium">
+                {alert.is_anomaly ? 'Active anomaly event' : 'Logged normal inference event'}
+              </p>
             </div>
           </div>
 
@@ -145,7 +148,7 @@ const EmptyAlertCard = () => (
         </span>
         <h3 className="heading-secondary text-lg mb-1">No active backend anomaly events</h3>
         <p className="text-xs text-[#45474d] font-medium">
-          The FastAPI dashboard summary did not return recent alerts yet. New LSTM Autoencoder events will appear here.
+          No saved backend events returned from /api/alerts yet. Run latest inference from Dashboard to create the first event.
         </p>
       </div>
     </div>
@@ -153,7 +156,7 @@ const EmptyAlertCard = () => (
 );
 
 const Alerts = () => {
-  const [summary, setSummary] = useState(null);
+  const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -163,9 +166,9 @@ const Alerts = () => {
     const loadAlerts = async () => {
       try {
         setLoading(true);
-        const payload = await fetchJsonWithAuth('/api/dashboard/summary');
+        const payload = await fetchJsonWithAuth('/api/alerts?limit=50');
         if (!ignore) {
-          setSummary(payload);
+          setAlerts(Array.isArray(payload) ? payload : []);
           setError(null);
         }
       } catch (err) {
@@ -188,17 +191,17 @@ const Alerts = () => {
     };
   }, []);
 
-  const alerts = useMemo(() => {
-    const rows = Array.isArray(summary?.recent_alerts) ? summary.recent_alerts : [];
-    return rows.filter((alert) => alert.is_anomaly);
-  }, [summary]);
+  const sortedAlerts = useMemo(() => alerts, [alerts]);
+  const activeCount = useMemo(() => alerts.filter((alert) => alert.is_anomaly).length, [alerts]);
 
   return (
     <div className="page-container space-y-10">
       <section className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h2 className="heading-primary text-3xl">Active Machine Alerts</h2>
-          <p className="text-subtitle mt-1">Backend anomaly events for maintenance review. Alert actions are manual in this demo.</p>
+          <p className="text-subtitle mt-1">
+            Saved backend inference events for maintenance review. {activeCount} active anomaly event(s), {Math.max(alerts.length - activeCount, 0)} logged normal event(s).
+          </p>
         </div>
         <div className="flex gap-3">
           <button disabled title="Filtering is not implemented in this demo" className="btn-secondary opacity-60 cursor-not-allowed">
@@ -216,14 +219,18 @@ const Alerts = () => {
         </div>
       )}
 
+      <Form4Warning>
+        Alert acknowledgement, ticket logging, filtering, and report export controls are disabled because those backend workflows are not implemented yet.
+      </Form4Warning>
+
       <section className="space-y-4">
-        {loading && !summary && (
+        {loading && alerts.length === 0 && (
           <div className="bg-white rounded-lg p-8 shadow-sm text-sm font-bold text-[#45474d]">
             Loading backend alerts...
           </div>
         )}
-        {!loading && alerts.length === 0 && <EmptyAlertCard />}
-        {alerts.map((alert) => (
+        {!loading && sortedAlerts.length === 0 && <EmptyAlertCard />}
+        {sortedAlerts.map((alert) => (
           <AlertCard key={alert.id || `${alert.machine_id}-${alert.timestamp}`} alert={alert} />
         ))}
       </section>
@@ -233,6 +240,10 @@ const Alerts = () => {
           <h2 className="heading-secondary text-xl">Maintenance Review Workflow</h2>
           <div className="h-px flex-grow bg-[#e0e3e2]"></div>
         </div>
+
+        <Form4Warning>
+          Acknowledge, Log Ticket, Filter, and Export stay disabled until the backend exposes audited workflow endpoints.
+        </Form4Warning>
 
         <div className="panel-card">
           <div className="flex items-start gap-4">

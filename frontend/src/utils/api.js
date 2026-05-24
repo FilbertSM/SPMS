@@ -1,5 +1,14 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
+export class ApiError extends Error {
+  constructor(message, status, payload = null) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.payload = payload;
+  }
+}
+
 const buildUrl = (url) => {
   if (/^https?:\/\//i.test(url)) return url;
   return `${API_BASE_URL}${url}`;
@@ -33,7 +42,7 @@ export const fetchJson = async (url, options = {}) => {
   const payload = await readPayload(response);
 
   if (!response.ok) {
-    throw new Error(errorMessage(payload, `Request failed with status ${response.status}`));
+    throw new ApiError(errorMessage(payload, `Request failed with status ${response.status}`), response.status, payload);
   }
 
   return payload;
@@ -53,7 +62,7 @@ export const postForm = async (url, formData, options = {}) => {
   const payload = await readPayload(response);
 
   if (!response.ok) {
-    throw new Error(errorMessage(payload, `Request failed with status ${response.status}`));
+    throw new ApiError(errorMessage(payload, `Request failed with status ${response.status}`), response.status, payload);
   }
 
   return payload;
@@ -86,7 +95,7 @@ export const fetchJsonWithAuth = async (url, options = {}) => {
   const payload = await readPayload(response);
 
   if (!response.ok) {
-    throw new Error(errorMessage(payload, `Request failed with status ${response.status}`));
+    throw new ApiError(errorMessage(payload, `Request failed with status ${response.status}`), response.status, payload);
   }
 
   return payload;
@@ -97,7 +106,7 @@ export const fetchBlobWithAuth = async (url, options = {}) => {
 
   if (!response.ok) {
     const payload = await readPayload(response);
-    throw new Error(errorMessage(payload, `Request failed with status ${response.status}`));
+    throw new ApiError(errorMessage(payload, `Request failed with status ${response.status}`), response.status, payload);
   }
 
   return response.blob();

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Form4Warning from '../components/Form4Warning';
 import { fetchJsonWithAuth } from '../utils/api';
 
 const FALLBACK_CURRENT = [4.8, 5.0, 4.6, 5.2, 4.9, 5.8, 6.4, 6.0, 6.2, 5.8, 6.1, 5.7, 6.6, 6.0, 6.3, 5.9, 6.7, 6.1, 6.4, 5.9, 6.2];
@@ -88,7 +89,10 @@ const Dashboard = () => {
     loading: false,
     result: null,
     error: null,
+    status: null,
+    lastRunAt: null,
   });
+  const [lastRefreshedAt, setLastRefreshedAt] = useState(null);
 
   const loadDashboard = useCallback(async ({ showLoading = true } = {}) => {
     try {
@@ -102,6 +106,7 @@ const Dashboard = () => {
 
       setSummary(summaryPayload);
       setTelemetry(Array.isArray(telemetryPayload) ? [...telemetryPayload].reverse() : []);
+      setLastRefreshedAt(new Date());
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -120,27 +125,38 @@ const Dashboard = () => {
   }, [loadDashboard]);
 
   const handleRunLatestInference = async () => {
-    setInferenceState((previous) => ({ ...previous, loading: true, error: null }));
+    setInferenceState((previous) => ({ ...previous, loading: true, error: null, status: null }));
     try {
       const result = await fetchJsonWithAuth(
         '/api/predict/anomaly/latest?machine_id=PMA%20Granulator%20%2301',
         { method: 'POST' },
       );
-      setInferenceState({ loading: false, result, error: null });
+      setInferenceState({ loading: false, result, error: null, status: null, lastRunAt: new Date() });
       await loadDashboard({ showLoading: false });
     } catch (err) {
-      setInferenceState((previous) => ({ ...previous, loading: false, error: err.message }));
+      setInferenceState((previous) => ({
+        ...previous,
+        loading: false,
+        error: err.message,
+        status: err.status || null,
+        lastRunAt: new Date(),
+      }));
     }
   };
 
+  const telemetryCurrentValues = useMemo(
+    () => telemetry.map((row) => toNumber(row.impeller_ampere)).filter((value) => value !== null),
+    [telemetry],
+  );
+  const currentUsesFallback = telemetryCurrentValues.length === 0;
   const currentValues = useMemo(() => {
-    const values = telemetry.map((row) => toNumber(row.impeller_ampere)).filter((value) => value !== null);
+    const values = telemetryCurrentValues;
     return values.length ? values : FALLBACK_CURRENT;
-  }, [telemetry]);
+  }, [telemetryCurrentValues]);
 
   const baselineValues = useMemo(() => movingAverage(currentValues), [currentValues]);
-  const vibrationValues = useMemo(() => {
-    const values = telemetry
+  const vibrationSensorValues = useMemo(() => {
+    return telemetry
       .map((row) => {
         const x = toNumber(row.x_axis_peak_acceleration);
         const z = toNumber(row.z_axis_peak_acceleration);
@@ -148,9 +164,12 @@ const Dashboard = () => {
         return ((x || 0) + (z || 0)) / (x !== null && z !== null ? 2 : 1);
       })
       .filter((value) => value !== null);
-
-    return values.length ? values : FALLBACK_VIBRATION;
   }, [telemetry]);
+  const vibrationUsesFallback = vibrationSensorValues.length === 0;
+  const vibrationValues = useMemo(
+    () => (vibrationSensorValues.length ? vibrationSensorValues : FALLBACK_VIBRATION),
+    [vibrationSensorValues],
+  );
 
   const latestReading = summary?.latest_reading || telemetry[telemetry.length - 1] || null;
   const latestPrediction = summary?.latest_prediction || null;
@@ -167,6 +186,10 @@ const Dashboard = () => {
           ? 'bg-[#75777d]'
           : 'bg-[#00743a]';
   const hasTelemetry = telemetry.length > 0;
+  const inferenceRuntimeMessage =
+    inferenceState.status === 503
+      ? 'ML runtime or artifacts are unavailable. Confirm Docker imports and copied model artifacts before rerunning latest-window inference.'
+      : null;
 
   const currentPoints = createPolylinePoints(currentValues, 1000, 100, 12);
   const baselinePoints = createPolylinePoints(baselineValues, 1000, 100, 12);
@@ -187,7 +210,7 @@ const Dashboard = () => {
   ];
 
   return (
-    <div className="page-container bg-[#f1f4f3] p-8 space-y-8 min-h-screen">
+    <div className="page-container bg-[#f1f4f3] space-y-8 min-h-screen">
       {error && (
         <div className="bg-[#ffdad6] border border-[#ba1a1a]/20 text-[#ba1a1a] rounded-lg px-4 py-3 text-sm font-bold">
           Backend data unavailable: {error}
@@ -231,9 +254,13 @@ const Dashboard = () => {
           <p className="mt-3 text-[11px] font-medium text-[#45474d]">
             Maintenance tickets are recorded manually in this demo.
           </p>
+          <Form4Warning className="mt-4">
+            UNFINISHED DEMO SECTION. The maintenance-ticket action is disabled because backend ticket creation is not implemented for Form 4.
+          </Form4Warning>
           {inferenceState.error && (
             <div className="mt-4 rounded-lg bg-[#ffdad6] px-4 py-3 text-xs font-bold text-[#ba1a1a]">
               Latest inference failed: {inferenceState.error}
+              {inferenceRuntimeMessage && <p className="mt-1 text-[#7c1d18]">{inferenceRuntimeMessage}</p>}
             </div>
           )}
           {inferenceState.result && (
@@ -260,6 +287,10 @@ const Dashboard = () => {
               </div>
             </div>
           )}
+          <div className="mt-4 flex flex-wrap gap-3 text-[11px] font-bold uppercase tracking-widest text-[#45474d]">
+            <span>Last refreshed: {lastRefreshedAt ? lastRefreshedAt.toLocaleTimeString() : 'Not yet'}</span>
+            <span>Last inference result: {inferenceState.lastRunAt ? inferenceState.lastRunAt.toLocaleTimeString() : 'Not run this session'}</span>
+          </div>
           <div className="absolute top-0 right-0 w-64 h-full opacity-5 pointer-events-none">
             <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
               <path d="M44.7,-76.4C58.1,-69.2,69.2,-58.1,77.3,-44.7C85.4,-31.3,90.5,-15.7,89.3,-0.7C88.1,14.3,80.7,28.6,71.5,41.2C62.3,53.8,51.3,64.7,38.1,72.4C24.9,80.1,9.4,84.6,-5.6,83.1C-20.6,81.6,-35.1,74.1,-47.3,64.8C-59.5,55.5,-69.4,44.4,-76.1,31.5C-82.8,18.6,-86.3,3.9,-84.4,-10.1C-82.5,-24.1,-75.2,-37.4,-65.4,-48.5C-55.6,-59.6,-43.3,-68.5,-30.2,-75.4C-17.1,-82.3,-3.2,-87.2,11.2,-86.3C25.6,-85.4,44.7,-76.4,44.7,-76.4Z" fill="#051125" transform="translate(140 100)"></path>
@@ -284,13 +315,16 @@ const Dashboard = () => {
 
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-8 bg-white rounded-xl p-6 shadow-sm border border-[#c5c6cd]/10">
+          {currentUsesFallback && <Form4Warning className="mb-5" />}
           <div className="flex items-center justify-between mb-8">
             <div>
               <h4 className="font-headline font-bold text-[#051125] flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#051125]">electric_bolt</span>
                 Motor Current vs Rolling Baseline
               </h4>
-              <p className="text-xs text-[#45474d] mt-1 font-body">Backend telemetry stream for impeller motor current</p>
+              <p className="text-xs text-[#45474d] mt-1 font-body">
+                {currentUsesFallback ? 'Fallback values shown because backend current telemetry is unavailable' : 'Backend telemetry stream for impeller motor current'}
+              </p>
             </div>
             <div className="flex items-center gap-4 text-[10px] font-bold font-headline uppercase tracking-widest">
               <div className="flex items-center gap-2">
@@ -377,6 +411,7 @@ const Dashboard = () => {
 
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-7 bg-white rounded-xl p-6 shadow-sm flex flex-col justify-between">
+          {vibrationUsesFallback && <Form4Warning className="mb-5" />}
           <div className="flex items-center justify-between mb-6">
             <h4 className="font-headline font-bold text-[#051125] flex items-center gap-2">
               <span className="material-symbols-outlined text-[#1b263b]">waves</span>

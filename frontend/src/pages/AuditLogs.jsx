@@ -5,6 +5,7 @@ const AuditLogs = () => {
   const [logs, setLogs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [accessDenied, setAccessDenied] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -16,8 +17,14 @@ const AuditLogs = () => {
       try {
         const data = await fetchJsonWithAuth('/api/audit-logs');
         setLogs(data);
+        setAccessDenied(false);
       } catch (err) {
-        setError(err.message);
+        if (err.status === 403) {
+          setAccessDenied(true);
+          setError(null);
+        } else {
+          setError(err.message);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -77,9 +84,9 @@ const AuditLogs = () => {
         <div>
           <h2 className="heading-primary text-3xl flex items-center gap-3">
             <span className="material-symbols-outlined text-3xl text-[#1b263b]">encrypted</span>
-            Security Audit Trail
+            Authenticated Backend Audit Events
           </h2>
-          <p className="text-subtitle mt-2">Real-time monitoring of user access, system modifications, and security anomalies.</p>
+          <p className="text-subtitle mt-2">Authenticated backend audit events recorded by the FastAPI service.</p>
         </div>
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-2 text-[10px] font-black text-[#2ecc71] bg-[#2ecc71]/10 px-4 py-2 rounded-sm border border-[#2ecc71]/20 tracking-widest">
@@ -132,9 +139,24 @@ const AuditLogs = () => {
         </div>
       )}
 
+      {accessDenied && (
+        <div className="panel-card border-l-4 border-l-[#ba1a1a]">
+          <div className="flex items-start gap-4">
+            <span className="material-symbols-outlined rounded-lg bg-[#ffdad6] p-2 text-[#ba1a1a]">lock</span>
+            <div>
+              <h3 className="heading-secondary text-xl">Admin access required</h3>
+              <p className="text-sm text-[#45474d] mt-2">
+                The backend returned 403 for audit logs. Sign in with an administrator account to view or export authenticated backend audit events.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Data Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-[#c5c6cd]/20 overflow-hidden">
-        <table className="w-full text-left border-collapse">
+      {!accessDenied && (
+      <div className="bg-white rounded-xl shadow-sm border border-[#c5c6cd]/20 overflow-x-auto">
+        <table className="min-w-[860px] w-full text-left border-collapse">
           <thead>
             <tr className="bg-[#f8faf9] border-b border-[#c5c6cd]/30">
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#75777d]">Temporal Data (UTC)</th>
@@ -146,9 +168,9 @@ const AuditLogs = () => {
           </thead>
           <tbody className="divide-y divide-[#ebeeed]">
             {isLoading ? (
-              <tr><td colSpan="5" className="text-center py-20 text-sm text-[#75777d] italic">Decrypting audit logs...</td></tr>
+              <tr><td colSpan="5" className="text-center py-20 text-sm text-[#75777d] italic">Loading audit logs...</td></tr>
             ) : currentLogs.length === 0 ? (
-              <tr><td colSpan="5" className="text-center py-20 text-sm text-[#75777d]">No security events found matching current filters.</td></tr>
+              <tr><td colSpan="5" className="text-center py-20 text-sm text-[#75777d]">No audit events found matching current filters.</td></tr>
             ) : (
               currentLogs.map((log) => (
                 <tr key={log.id} className="hover:bg-[#f9fafb] transition-colors group">
@@ -185,9 +207,11 @@ const AuditLogs = () => {
           </tbody>
         </table>
       </div>
+      )}
 
       {/* --- 5. UI PAGINATION BARU --- */}
-      <div className="mt-6 flex items-center justify-between">
+      {!accessDenied && (
+      <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <p className="text-xs text-[#75777d] font-medium">
           Showing {filteredLogs.length === 0 ? 0 : indexOfFirstLog + 1} to {Math.min(indexOfLastLog, filteredLogs.length)} of {filteredLogs.length} security entries
         </p>
@@ -214,6 +238,7 @@ const AuditLogs = () => {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 };

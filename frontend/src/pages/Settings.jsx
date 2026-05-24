@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import Form4Warning from '../components/Form4Warning';
 import { fetchJsonWithAuth } from '../utils/api';
 
 const formatNumber = (value, decimals = 3) => {
@@ -51,7 +52,11 @@ export default function Settings() {
     };
   }, []);
 
-  const artifacts = useMemo(() => Object.entries(summary?.artifact_status || {}), [summary]);
+  const artifacts = useMemo(
+    () => Object.entries(summary?.artifact_status || {}).filter(([, value]) => typeof value === 'boolean'),
+    [summary],
+  );
+  const modelPath = summary?.artifact_status?.model_path;
 
   return (
     <div className="page-container">
@@ -73,6 +78,10 @@ export default function Settings() {
           Save Global Config
         </button>
       </div>
+
+      <Form4Warning>
+        Settings controls are read-only or disabled for Form 4. Editable admin configuration is not implemented in the backend yet.
+      </Form4Warning>
 
       {error && (
         <div className="bg-[#ffdad6] border border-[#ba1a1a]/20 text-[#ba1a1a] rounded-lg px-4 py-3 text-sm font-bold">
@@ -120,6 +129,9 @@ export default function Settings() {
           </div>
 
           <div className="mt-8 rounded-lg border border-[#c5c6cd]/30 bg-white p-4">
+            <Form4Warning className="mb-4">
+              Threshold editing is a future admin workflow and is intentionally disabled.
+            </Form4Warning>
             <div className="flex items-start gap-3">
               <span className="material-symbols-outlined text-[#45474d]">lock</span>
               <div>
@@ -147,10 +159,19 @@ export default function Settings() {
             {artifacts.map(([name, ready]) => (
               <ArtifactStatus key={name} name={name} ready={Boolean(ready)} />
             ))}
+            {modelPath && (
+              <div className="rounded-lg bg-[#f1f4f3] px-4 py-3 border border-[#c5c6cd]/20">
+                <p className="text-[10px] font-black uppercase tracking-widest text-[#45474d]">Model Path</p>
+                <p className="mt-1 break-all text-xs font-bold text-[#1b263b]">{modelPath}</p>
+              </div>
+            )}
           </div>
         </section>
 
         <section className="panel-card col-span-12 lg:col-span-5">
+          <Form4Warning className="mb-6">
+            Notification rules below are future controls and do not persist to the backend.
+          </Form4Warning>
           <div className="flex items-center gap-3 mb-8">
             <span className="material-symbols-outlined text-[#1b263b] bg-[#f1f4f3] p-2 rounded-lg">
               mail
@@ -182,6 +203,9 @@ export default function Settings() {
         </section>
 
         <section className="panel-card col-span-12 lg:col-span-7">
+          <Form4Warning className="mb-6">
+            User administration is not wired to a backend user-list or role-management workflow.
+          </Form4Warning>
           <div className="flex items-center justify-between mb-8 gap-4">
             <div className="flex items-center gap-3">
               <span className="material-symbols-outlined text-[#1b263b] bg-[#f1f4f3] p-2 rounded-lg">
@@ -210,6 +234,9 @@ export default function Settings() {
         </section>
 
         <section className="panel-card col-span-12 flex flex-col md:flex-row gap-6 md:items-center md:justify-between border-l-4 border-l-[#1b263b]">
+          <Form4Warning className="md:max-w-md">
+            Security and retention controls are display-only until audited settings endpoints exist.
+          </Form4Warning>
           <div className="flex items-center gap-4">
             <span className="material-symbols-outlined text-[#1b263b]">security</span>
             <div>

@@ -31,7 +31,7 @@ const ForgotPasswordModal = ({ isOpen, onClose }) => {
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl">&times;</button>
         
         <h3 className="text-2xl font-bold text-[#1b263b] mb-2">Reset Password</h3>
-        <p className="text-gray-500 text-sm mb-6">Enter your email to receive a recovery link.</p>
+        <p className="text-gray-500 text-sm mb-6">Enter your approved SPMS email to receive a recovery link.</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {status.message && (
@@ -41,7 +41,7 @@ const ForgotPasswordModal = ({ isOpen, onClose }) => {
           )}
           <input 
             type="email" 
-            placeholder="example@gmail.com"
+            placeholder="operator@sakafarma.com"
             className="w-full px-4 py-3 bg-gray-100 rounded-lg outline-none focus:ring-2 focus:ring-[#1b263b]"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
