@@ -33,39 +33,46 @@ const Login = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     setError(null);
-
-    // Run client-side validation first
     if (!validateForm()) return;
-
     setIsLoading(true);
 
     try {
-      const formData = new URLSearchParams();
-      formData.append('username', email);
-      formData.append('password', password);
+      // 1. Buat data dalam format yang dimau FastAPI (username & password)
+      const details = {
+        'username': email,
+        'password': password
+      };
 
-      const data = await postForm('http://127.0.0.1:8000/api/login', formData);
-      localStorage.setItem('spms_token', data.access_token);
-      
-      // Handle Remember Me storage
-      if (rememberMe) {
-        localStorage.setItem('spms_remembered_email', email);
-      } else {
-        localStorage.removeItem('spms_remembered_email');
+      // 2. Ubah object di atas menjadi string "username=...&password=..."
+      const formBody = Object.keys(details)
+        .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(details[key]))
+        .join('&');
+
+      // 3. Kirim dengan header yang sangat spesifik
+      const response = await fetch('http://127.0.0.1:8000/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json'
+        },
+        body: formBody
+      });
+
+      if (!response.ok) {
+        throw new Error('Invalid credentials');
       }
 
-      console.log("Authentication successful. Token secured.");
-      setSuccessMsg("Login successful! Redirecting...");
+      const data = await response.json();
+      localStorage.setItem('spms_token', data.access_token);
       
-      setTimeout(() => {
-        navigate('/app');
-      }, 1000);
+      setSuccessMsg("Login successful!");
+      setTimeout(() => { navigate('/app'); }, 1000);
       
     } catch (err) {
-      setError(err.message);
+      setError("Login failed: Invalid email or password.");
       setIsLoading(false);
     }
-  };
+  };a
 
   const handleCloseError = useCallback(() => {
     setIsClosing(true);

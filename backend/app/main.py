@@ -1,3 +1,4 @@
+import re
 import csv
 import io
 import json
@@ -55,9 +56,7 @@ conf = ConnectionConfig(
 
 
 def get_application() -> FastAPI:
-    # print("--- ⚠️ RESET DATABASE SEMENTARA ⚠️ ---")
     try:
-        # models.Base.metadata.drop_all(bind=engine)
         models.Base.metadata.create_all(bind=engine)
     except SQLAlchemyError as exc:
         print(f"WARNING: database table initialization skipped: {exc}")
@@ -69,14 +68,7 @@ def get_application() -> FastAPI:
         version="1.0.0",
     )
 
-<<<<<<< HEAD
-    # --- ADD A STATE & EXCEPTION HANDLER LIMITER TO THE APP ---
-    app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-=======
     cors_origins = [str(origin).rstrip("/") for origin in settings.BACKEND_CORS_ORIGINS]
->>>>>>> 21efa9b74514257255ac7ff8d999cb451b3a0d16
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
@@ -224,7 +216,6 @@ def register_user(request: Request, user: schemas.UserCreate, db: Session = Depe
             detail="Registration is restricted to official company domains only.",
         )
 
-<<<<<<< HEAD
     # 3. Gagal karena Kompleksitas Password Kurang
     has_uppercase = re.search(r"[A-Z]", user.password)
     has_number = re.search(r"[0-9]", user.password)
@@ -244,9 +235,6 @@ def register_user(request: Request, user: schemas.UserCreate, db: Session = Depe
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Password must be at least 8 characters long and contain uppercase letters, numbers, and symbols.",
         )
-=======
-    security.validate_password_policy(user.password)
->>>>>>> 21efa9b74514257255ac7ff8d999cb451b3a0d16
 
     print(f"--- DEBUG: Security validation passed for user: {normalized_email} ---")
 

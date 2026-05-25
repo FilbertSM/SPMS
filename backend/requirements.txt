@@ -1,4 +1,4 @@
-aiosmtplib==5.1.0
+aiosmtplib
 annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.13.0
@@ -52,3 +52,4 @@ uvicorn==0.29.0
 watchfiles==1.1.1
 websockets==16.0
 wrapt==2.1.2
+fastapi-mail==1.4.1
