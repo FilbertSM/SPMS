@@ -535,6 +535,80 @@ def update_user_preferences(
         "email_notifications": current_user.email_notifications,
     }
 
+# ==========================================
+# --- MAINTENANCE TICKET ENDPOINTS (E2EE) ---
+# ==========================================
+
+@app.post("/api/tickets", response_model=schemas.MaintenanceTicketResponse, status_code=status.HTTP_201_CREATED)
+def create_maintenance_ticket(
+    request: Request,
+    ticket: schemas.MaintenanceTicketCreate,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Receives a new maintenance ticket from the frontend dashboard.
+    The 'issue_description' field must be pre-encrypted using End-to-End Encryption (E2EE)
+    before being transmitted to this endpoint.
+    """
+    # Initialize and save the encrypted ticket payload to MariaDB
+    new_ticket = models.MaintenanceTicket(
+        machine_id=ticket.machine_id,
+        issue_description=ticket.issue_description,  # Stores the raw AES ciphertext safely
+        reported_by=current_user.email,
+        status="Open"
+    )
+    db.add(new_ticket)
+    
+    # Log the security event into the centralized audit trail system
+    _record_audit_log(
+        db,
+        request=request,
+        user_email=current_user.email,
+        action="CREATE_MAINTENANCE_TICKET",
+        status_value="SUCCESS"
+    )
+    
+    db.commit()
+    db.refresh(new_ticket)
+    
+    return new_ticket
+
+
+@app.get("/api/tickets", response_model=list[schemas.MaintenanceTicketResponse])
+def get_maintenance_tickets(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    Fetches the complete history of maintenance logs from the database.
+    Results are automatically sorted by the most recent timestamp.
+    Decryption of encrypted payloads will handle strictly on the client-side.
+    """
+    # Log the access attempt into the security audit trail
+    _record_audit_log(
+        db,
+        request=request,
+        user_email=current_user.email,
+        action="VIEW_MAINTENANCE_TICKETS",
+        status_value="SUCCESS"
+    )
+    
+    # Query all records from the maintenance_tickets table ordered by descending time
+    tickets = db.query(models.MaintenanceTicket).order_by(models.MaintenanceTicket.timestamp.desc()).all()
+    
+    return tickets
+
+def get_maintenance_tickets(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    This endpoint retrieves the entire ticket history from the database, 
+    sorted from the most recent.    
+    """
+    return db.query(models.MaintenanceTicket).order_by(models.MaintenanceTicket.timestamp.desc()).all()
 
 # ==========================================
 # --- TEAMMATE ML & TELEMETRY ENDPOINTS ---

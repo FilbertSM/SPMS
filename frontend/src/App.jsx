@@ -16,6 +16,7 @@ const PmaDashboard = lazy(() => import('./pages/PMAChart'));
 const MotorChart = lazy(() => import('./pages/VibrationChart'));
 const Support = lazy(() => import('./pages/Support'));
 const SystemStatus = lazy(() => import('./pages/SystemStatus'));
+const MaintenanceTicket = lazy(() => import('./pages/MaintenanceTicket'));
 
 const PageFallback = () => (
   <div className="page-container flex items-center justify-center">
@@ -57,6 +58,7 @@ function App() {
             <Route path="vibration" element={<Suspense fallback={<PageFallback />}><MotorChart /></Suspense>} />
             <Route path="support" element={<Suspense fallback={<PageFallback />}><Support /></Suspense>} />
             <Route path="status" element={<Suspense fallback={<PageFallback />}><SystemStatus /></Suspense>} />
+            <Route path="maintenance" element={<Suspense fallback={<PageFallback />}><MaintenanceTicket /></Suspense>} />np
           </Route>
         </Route>
 

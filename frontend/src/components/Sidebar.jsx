@@ -57,13 +57,13 @@ const Sidebar = () => {
         </div>
 
         <div className="mt-auto p-6 space-y-6">
-          <button
-            disabled
-            title="Manual workflow only in the Form 4 demo"
-            className="w-full py-3 bg-[#1b263b]/60 text-[#f1f4f3] font-bold rounded-lg text-xs uppercase tracking-widest cursor-not-allowed"
+          <Link
+            to="/app/maintenance"
+            className="flex items-center justify-center gap-2 w-full py-3 bg-[#1b263b] hover:bg-[#051125] text-[#6bfe9c] dark:text-[#6bfe9c] font-bold rounded-lg text-xs uppercase tracking-widest shadow-md transition-all duration-200"
           >
-              Log Ticket
-          </button>
+            <span className="material-symbols-outlined text-base">assignment_add</span>
+            Log Ticket
+          </Link>
           <div className="space-y-1">
             {secondaryItems.map((item) => (
               <Link key={item.path} to={item.path} className={getMenuClasses(item.path) + " !py-2 text-xs"}>

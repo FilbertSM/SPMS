@@ -72,7 +72,7 @@ const Login = () => {
       setError("Login failed: Invalid email or password.");
       setIsLoading(false);
     }
-  };a
+  };
 
   const handleCloseError = useCallback(() => {
     setIsClosing(true);

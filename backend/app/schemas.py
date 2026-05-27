@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, Field, EmailStr
+from typing import Optional
 
 class UserCreate(BaseModel):
     full_name: str
@@ -109,3 +110,18 @@ class DashboardSummary(BaseModel):
     skipped_window_count: int | None
     artifact_status: dict[str, Any]
     recent_alerts: list[AlertResponse]
+
+class MaintenanceTicketCreate(BaseModel):
+    machine_id: str
+    issue_description: str
+
+class MaintenanceTicketResponse(BaseModel):
+    id: int
+    machine_id: str
+    issue_description: str
+    reported_by: str
+    timestamp: datetime
+    status: str
+
+    class Config:
+        from_attributes = True

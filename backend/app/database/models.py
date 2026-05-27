@@ -63,3 +63,15 @@ class AnomalyEvent(Base):
     threshold_policy = Column(String(255), nullable=True)
     model_version = Column(String(255), nullable=True)
     details = Column(Text, nullable=True)
+    
+class MaintenanceTicket(Base):
+    __tablename__ = "maintenance_tickets"
+
+    # Pastikan baris di bawah ini ada tulisan primary_key=True
+    id = Column(Integer, primary_key=True, index=True) 
+    
+    machine_id = Column(String(50), index=True)
+    issue_description = Column(Text, nullable=False)
+    reported_by = Column(String(100), nullable=False)
+    status = Column(String(20), default="Open")
+    timestamp = Column(DateTime(timezone=True), server_default=func.now())

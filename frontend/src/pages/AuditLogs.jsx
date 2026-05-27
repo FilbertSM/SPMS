@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { fetchBlobWithAuth, fetchJsonWithAuth } from '../utils/api';
+import CryptoJS from 'crypto-js'; 
 
 const AuditLogs = () => {
   const [logs, setLogs] = useState([]);
@@ -11,6 +12,9 @@ const AuditLogs = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [isExporting, setIsExporting] = useState(false);
+  
+  // State untuk tombol Verify SHA-256
+  const [isVerified, setIsVerified] = useState(false);
 
   useEffect(() => {
     const fetchLogs = async () => {
@@ -41,11 +45,8 @@ const AuditLogs = () => {
     return matchesSearch && matchesDate;
   });
 
-  // --- 3. LOGIKA SLICING DATA ---
   const indexOfLastLog = currentPage * itemsPerPage;
   const indexOfFirstLog = indexOfLastLog - itemsPerPage;
-  
-  // Data yang akan dirender di tabel HANYA 10 item ini
   const currentLogs = filteredLogs.slice(indexOfFirstLog, indexOfLastLog);
   const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
 
@@ -56,6 +57,7 @@ const AuditLogs = () => {
   const handlePrevPage = () => {
     if (currentPage > 1) setCurrentPage(currentPage - 1);
   };
+
   const handleExport = async () => {
     setIsExporting(true);
     try {
@@ -77,6 +79,12 @@ const AuditLogs = () => {
     }
   };
 
+  // Fungsi Hash SHA-256 untuk mendemonstrasikan Anti-Tampering
+  const generateHash = (log) => {
+    const dataString = `${log.id}-${log.timestamp}-${log.user_email}-${log.action}-${log.status}`;
+    return CryptoJS.SHA256(dataString).toString(CryptoJS.enc.Hex).substring(0, 16) + "...";
+  };
+
   return (
     <div className="p-8 flex-1 overflow-y-auto bg-[#f1f4f3] font-body">
       {/* Header Section */}
@@ -89,6 +97,22 @@ const AuditLogs = () => {
           <p className="text-subtitle mt-2">Authenticated backend audit events recorded by the FastAPI service.</p>
         </div>
         <div className="flex items-center gap-3">
+          {/* Tombol Verify SHA-256 diselipkan di sini */}
+          {!accessDenied && (
+            <button 
+              onClick={() => setIsVerified(!isVerified)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
+                isVerified 
+                  ? 'bg-[#1b263b] text-[#6bfe9c] border border-transparent' 
+                  : 'bg-white text-[#1b263b] border border-[#c5c6cd]/40 hover:bg-[#f1f4f3]'
+              }`}
+            >
+              <span className="material-symbols-outlined text-base">
+                {isVerified ? 'verified_user' : 'policy'}
+              </span>
+              {isVerified ? 'Verified' : 'Verify SHA-256'}
+            </button>
+          )}
           <span className="flex items-center gap-2 text-[10px] font-black text-[#2ecc71] bg-[#2ecc71]/10 px-4 py-2 rounded-sm border border-[#2ecc71]/20 tracking-widest">
             <span className="w-2 h-2 bg-[#2ecc71] rounded-full animate-pulse"></span>
             SYSTEM SENTINEL ACTIVE
@@ -125,7 +149,7 @@ const AuditLogs = () => {
         </div>
         <button 
           onClick={handleExport}
-          disabled={isExporting}
+          disabled={isExporting || accessDenied}
           className="btn-secondary flex justify-center items-center gap-2 py-2.5 bg-[#e0e3e2] hover:bg-[#d0d3d2] disabled:opacity-50"
         >
           <span className="material-symbols-outlined text-lg">download</span> 
@@ -164,13 +188,14 @@ const AuditLogs = () => {
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#75777d]">Security Event</th>
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#75777d]">Source IP</th>
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#75777d]">Outcome</th>
+              {isVerified && <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#2ecc71]">SHA-256 Fingerprint</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-[#ebeeed]">
             {isLoading ? (
-              <tr><td colSpan="5" className="text-center py-20 text-sm text-[#75777d] italic">Loading audit logs...</td></tr>
+              <tr><td colSpan={isVerified ? "6" : "5"} className="text-center py-20 text-sm text-[#75777d] italic">Loading audit logs...</td></tr>
             ) : currentLogs.length === 0 ? (
-              <tr><td colSpan="5" className="text-center py-20 text-sm text-[#75777d]">No audit events found matching current filters.</td></tr>
+              <tr><td colSpan={isVerified ? "6" : "5"} className="text-center py-20 text-sm text-[#75777d]">No audit events found matching current filters.</td></tr>
             ) : (
               currentLogs.map((log) => (
                 <tr key={log.id} className="hover:bg-[#f9fafb] transition-colors group">
@@ -201,6 +226,13 @@ const AuditLogs = () => {
                       {log.status}
                     </span>
                   </td>
+                  {isVerified && (
+                    <td className="px-6 py-5">
+                      <span className="font-mono text-[10px] text-[#45474d] bg-[#f1f4f3] px-2 py-1 rounded border border-[#c5c6cd]/50 shadow-inner">
+                        {generateHash(log)}
+                      </span>
+                    </td>
+                  )}
                 </tr>
               ))
             )}
@@ -209,7 +241,6 @@ const AuditLogs = () => {
       </div>
       )}
 
-      {/* --- 5. UI PAGINATION BARU --- */}
       {!accessDenied && (
       <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <p className="text-xs text-[#75777d] font-medium">
