@@ -1,16 +1,30 @@
 import { useEffect, useMemo, useState } from 'react';
-import Form4Warning from '../components/Form4Warning';
 import { fetchJsonWithAuth } from '../utils/api';
 
 const statusLabel = (value) => (value ? 'Ready' : 'Missing');
+const statusColor = (value) => (value ? 'text-[#006d37]' : 'text-[#ba1a1a]');
+
+const CheckCard = ({ label, value, detail, icon }) => (
+  <div className="rounded-lg border border-[#c5c6cd]/30 bg-white p-4 shadow-sm">
+    <div className="flex items-start gap-3">
+      <span className={`material-symbols-outlined mt-0.5 ${statusColor(value)}`}>{icon}</span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] font-black uppercase tracking-widest text-[#45474d]">{label}</p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${value ? 'bg-[#e8f5e9] text-[#00743a]' : 'bg-[#ffdad6] text-[#ba1a1a]'}`}>
+            {value ? 'Ready' : 'Issue'}
+          </span>
+        </div>
+        {detail && <p className="text-xs font-medium text-[#45474d] mt-3 leading-relaxed">{detail}</p>}
+      </div>
+    </div>
+  </div>
+);
 
 const SystemStatus = () => {
-  const [summary, setSummary] = useState(null);
-  const [telemetry, setTelemetry] = useState([]);
-  const [alerts, setAlerts] = useState([]);
+  const [status, setStatus] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [lastChecked, setLastChecked] = useState(null);
 
   useEffect(() => {
     let ignore = false;
@@ -18,26 +32,15 @@ const SystemStatus = () => {
     const loadStatus = async () => {
       try {
         setLoading(true);
-        const [summaryPayload, telemetryPayload, alertsPayload] = await Promise.all([
-          fetchJsonWithAuth('/api/dashboard/summary'),
-          fetchJsonWithAuth('/api/telemetry/latest?limit=1'),
-          fetchJsonWithAuth('/api/alerts?limit=5'),
-        ]);
+        const payload = await fetchJsonWithAuth('/api/system/status');
         if (!ignore) {
-          setSummary(summaryPayload);
-          setTelemetry(Array.isArray(telemetryPayload) ? telemetryPayload : []);
-          setAlerts(Array.isArray(alertsPayload) ? alertsPayload : []);
-          setLastChecked(new Date());
+          setStatus(payload);
           setError(null);
         }
       } catch (err) {
-        if (!ignore) {
-          setError(err.message);
-        }
+        if (!ignore) setError(err.message);
       } finally {
-        if (!ignore) {
-          setLoading(false);
-        }
+        if (!ignore) setLoading(false);
       }
     };
 
@@ -48,8 +51,8 @@ const SystemStatus = () => {
   }, []);
 
   const artifactEntries = useMemo(
-    () => Object.entries(summary?.artifact_status || {}).filter(([, value]) => typeof value === 'boolean'),
-    [summary],
+    () => Object.entries(status?.ml_artifacts || {}).filter(([, value]) => typeof value === 'boolean'),
+    [status],
   );
 
   return (
@@ -57,8 +60,8 @@ const SystemStatus = () => {
       <div className="space-y-6">
         <div>
           <h1 className="heading-primary text-3xl">System Status</h1>
-          <p className="text-subtitle mt-2">
-            Read-only backend/API status for the Form 4 demo. This page does not modify machine or model settings.
+          <p className="text-subtitle mt-2 max-w-2xl">
+            Backend evidence for database, telemetry, audit chain, threshold, and ML runtime readiness.
           </p>
         </div>
 
@@ -68,31 +71,46 @@ const SystemStatus = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="panel-card">
-            <p className="text-[10px] font-black uppercase tracking-widest text-[#45474d]">Dashboard Summary</p>
-            <p className="text-2xl font-black text-[#051125] mt-2">{summary ? 'Reachable' : loading ? 'Checking...' : 'Unavailable'}</p>
-          </div>
-          <div className="panel-card">
-            <p className="text-[10px] font-black uppercase tracking-widest text-[#45474d]">Latest Telemetry</p>
-            <p className="text-2xl font-black text-[#051125] mt-2">{telemetry.length ? 'Rows returned' : loading ? 'Checking...' : 'No rows'}</p>
-          </div>
-          <div className="panel-card">
-            <p className="text-[10px] font-black uppercase tracking-widest text-[#45474d]">Alert Events</p>
-            <p className="text-2xl font-black text-[#051125] mt-2">{alerts.length} recent</p>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <CheckCard
+            label="Database"
+            value={Boolean(status?.database?.connected)}
+            detail={loading ? 'Checking database connection...' : status?.database?.detail}
+            icon="database"
+          />
+          <CheckCard
+            label="Telemetry Source"
+            value={Boolean(status?.telemetry_source?.available)}
+            detail={loading ? 'Checking telemetry source...' : status?.telemetry_source?.detail}
+            icon="sensors"
+          />
+          <CheckCard
+            label="Audit Chain"
+            value={status?.audit_chain?.overall_status === 'VERIFIED'}
+            detail={status?.audit_chain ? `${status.audit_chain.valid_count}/${status.audit_chain.total_logs_checked} logs verified` : 'Checking audit hash chain...'}
+            icon="verified_user"
+          />
+          <CheckCard
+            label="Threshold"
+            value={Boolean(status?.threshold?.threshold)}
+            detail={status?.threshold ? `${status.threshold.threshold_source}: ${status.threshold.threshold.toFixed(3)}` : 'Checking threshold state...'}
+            icon="tune"
+          />
         </div>
 
         <section className="panel-card">
-          <h2 className="heading-secondary text-xl mb-4">ML Runtime Readiness</h2>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4">
+            <h2 className="heading-secondary text-xl">ML Runtime Readiness</h2>
+            <span className="text-[10px] font-black uppercase tracking-widest text-[#45474d]">{artifactEntries.length} artifact checks</span>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {artifactEntries.length === 0 && (
               <p className="text-sm font-bold text-[#45474d]">No boolean artifact readiness keys returned yet.</p>
             )}
             {artifactEntries.map(([key, ready]) => (
-              <div key={key} className="rounded-lg bg-[#f1f4f3] border border-[#c5c6cd]/20 px-4 py-3 flex items-center justify-between">
+              <div key={key} className="rounded-lg bg-[#f1f4f3] border border-[#c5c6cd]/20 px-4 py-3 flex items-center justify-between gap-4">
                 <span className="text-sm font-bold capitalize text-[#1b263b]">{key.replaceAll('_', ' ')}</span>
-                <span className={`text-[10px] font-black uppercase tracking-widest ${ready ? 'text-[#006d37]' : 'text-[#ba1a1a]'}`}>
+                <span className={`text-[10px] font-black uppercase tracking-widest ${statusColor(ready)}`}>
                   {statusLabel(ready)}
                 </span>
               </div>
@@ -100,13 +118,25 @@ const SystemStatus = () => {
           </div>
         </section>
 
-        <Form4Warning>
-          UNFINISHED DEMO SECTION. This page is read-only status evidence. Automated service health checks, alert routing, and uptime monitoring are not implemented in the frontend.
-        </Form4Warning>
-
-        <p className="text-xs font-bold text-[#45474d]">
-          Last checked: {lastChecked ? lastChecked.toLocaleString() : 'Not checked yet'}
-        </p>
+        <section className="panel-card">
+          <h2 className="heading-secondary text-xl mb-4">Runtime Evidence</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="rounded-lg bg-[#f1f4f3] p-4 border border-[#c5c6cd]/20">
+              <p className="text-[10px] font-black uppercase tracking-widest text-[#45474d]">Effective Threshold</p>
+              <p className="text-xl font-black text-[#051125] mt-2">{status?.threshold?.threshold?.toFixed(3) || '-'}</p>
+            </div>
+            <div className="rounded-lg bg-[#f1f4f3] p-4 border border-[#c5c6cd]/20">
+              <p className="text-[10px] font-black uppercase tracking-widest text-[#45474d]">Artifact Threshold</p>
+              <p className="text-xl font-black text-[#051125] mt-2">{status?.threshold?.artifact_threshold?.toFixed(3) || '-'}</p>
+            </div>
+            <div className="rounded-lg bg-[#f1f4f3] p-4 border border-[#c5c6cd]/20">
+              <p className="text-[10px] font-black uppercase tracking-widest text-[#45474d]">Checked At</p>
+              <p className="text-sm font-black text-[#051125] mt-2">
+                {status?.checked_at ? new Date(status.checked_at).toLocaleString() : 'Not checked yet'}
+              </p>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );

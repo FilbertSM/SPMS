@@ -1,5 +1,6 @@
 import re
 import csv
+import hashlib
 import io
 import json
 from datetime import datetime, timezone
@@ -11,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -55,9 +56,211 @@ conf = ConnectionConfig(
 )
 
 
+AUDIT_HASH_ALGORITHM = "SHA-256"
+AUDIT_HASH_PAYLOAD_VERSION = "audit-v1"
+THRESHOLD_OVERRIDE_KEY = "anomaly_threshold_override"
+VALID_TICKET_STATUSES = {"OPEN", "IN_REVIEW", "RESOLVED"}
+
+
+def _format_audit_timestamp(value: datetime | None) -> str:
+    if value is None:
+        return ""
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc).isoformat(timespec="microseconds")
+
+
+def _canonical_audit_payload(log: models.AuditLog) -> str:
+    payload = {
+        "id": log.id,
+        "timestamp": _format_audit_timestamp(log.timestamp),
+        "user_email": log.user_email or "",
+        "action": log.action or "",
+        "status": log.status or "",
+        "ip_address": log.ip_address or "",
+        "browser_info": log.browser_info or "",
+        "previous_hash": log.previous_hash or "",
+        "hash_algorithm": log.hash_algorithm or AUDIT_HASH_ALGORITHM,
+        "hash_payload_version": log.hash_payload_version or AUDIT_HASH_PAYLOAD_VERSION,
+    }
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"))
+
+
+def _calculate_audit_hash(log: models.AuditLog) -> str:
+    return hashlib.sha256(_canonical_audit_payload(log).encode("utf-8")).hexdigest()
+
+
+def _append_audit_log(
+    db: Session,
+    *,
+    user_email: str | None,
+    action: str,
+    status_value: str,
+    ip_address: str | None,
+    browser_info: str | None,
+) -> models.AuditLog:
+    previous = (
+        db.query(models.AuditLog)
+        .filter(models.AuditLog.record_hash.isnot(None))
+        .order_by(models.AuditLog.id.desc())
+        .first()
+    )
+    log = models.AuditLog(
+        timestamp=datetime.now(timezone.utc),
+        user_email=user_email,
+        action=action,
+        status=status_value,
+        ip_address=ip_address,
+        browser_info=browser_info,
+        previous_hash=previous.record_hash if previous else None,
+        hash_algorithm=AUDIT_HASH_ALGORITHM,
+        hash_payload_version=AUDIT_HASH_PAYLOAD_VERSION,
+    )
+    db.add(log)
+    db.flush()
+    log.record_hash = _calculate_audit_hash(log)
+    return log
+
+
+def _audit_context(request: Request) -> tuple[str, str]:
+    client_ip = request.client.host if request.client else "Unknown"
+    user_agent = request.headers.get("user-agent", "Unknown")
+    return client_ip, user_agent
+
+
+def _password_policy_error(password: str) -> str | None:
+    has_uppercase = re.search(r"[A-Z]", password)
+    has_number = re.search(r"[0-9]", password)
+    has_symbol = re.search(r"[^A-Za-z0-9]", password)
+    if len(password) < 8 or len(password) > 20 or not has_uppercase or not has_number or not has_symbol:
+        return "Password must be at least 8 characters long and contain uppercase letters, numbers, and symbols."
+    return None
+
+
+def _verify_audit_hash_chain(db: Session) -> dict:
+    logs = db.query(models.AuditLog).order_by(models.AuditLog.id.asc()).all()
+    invalid_ids: list[int] = []
+    valid_count = 0
+    previous_hash = None
+    chain_head_hash = None
+
+    for log in logs:
+        expected_hash = _calculate_audit_hash(log)
+        if (
+            not log.record_hash
+            or log.previous_hash != previous_hash
+            or log.hash_algorithm != AUDIT_HASH_ALGORITHM
+            or log.hash_payload_version != AUDIT_HASH_PAYLOAD_VERSION
+            or log.record_hash != expected_hash
+        ):
+            invalid_ids.append(log.id)
+        else:
+            valid_count += 1
+        previous_hash = log.record_hash
+        chain_head_hash = log.record_hash
+
+    return {
+        "total_logs_checked": len(logs),
+        "valid_count": valid_count,
+        "invalid_log_ids": invalid_ids,
+        "chain_head_hash": chain_head_hash,
+        "overall_status": "VERIFIED" if not invalid_ids else "COMPROMISED",
+        "hash_algorithm": AUDIT_HASH_ALGORITHM,
+        "hash_payload_version": AUDIT_HASH_PAYLOAD_VERSION,
+    }
+
+
+def _ensure_audit_log_hash_columns() -> None:
+    try:
+        existing = {column["name"] for column in inspect(engine).get_columns("audit_logs")}
+    except SQLAlchemyError as exc:
+        print(f"WARNING: audit hash column inspection skipped: {exc}")
+        return
+
+    definitions = {
+        "record_hash": "VARCHAR(64)",
+        "previous_hash": "VARCHAR(64)",
+        "hash_algorithm": "VARCHAR(20) DEFAULT 'SHA-256'",
+        "hash_payload_version": "VARCHAR(20) DEFAULT 'audit-v1'",
+    }
+    missing = [name for name in definitions if name not in existing]
+    if not missing:
+        return
+
+    try:
+        with engine.begin() as connection:
+            for column_name in missing:
+                connection.execute(
+                    text(f"ALTER TABLE audit_logs ADD COLUMN {column_name} {definitions[column_name]}")
+                )
+    except SQLAlchemyError as exc:
+        print(f"WARNING: audit hash column migration skipped: {exc}")
+
+
+def _ensure_form4_workflow_columns() -> None:
+    column_sets = {
+        "anomaly_events": {
+            "threshold_source": "VARCHAR(50) DEFAULT 'artifact_baseline'",
+            "acknowledged_at": "DATETIME",
+            "acknowledged_by": "VARCHAR(255)",
+            "acknowledgement_note": "TEXT",
+        },
+        "maintenance_tickets": {
+            "anomaly_event_id": "INTEGER",
+            "resolution_note": "TEXT",
+            "updated_at": "DATETIME",
+            "resolved_at": "DATETIME",
+        },
+    }
+
+    try:
+        inspector = inspect(engine)
+        table_names = set(inspector.get_table_names())
+    except SQLAlchemyError as exc:
+        print(f"WARNING: Form 4 workflow column inspection skipped: {exc}")
+        return
+
+    try:
+        with engine.begin() as connection:
+            for table_name, definitions in column_sets.items():
+                if table_name not in table_names:
+                    continue
+                existing = {column["name"] for column in inspector.get_columns(table_name)}
+                for column_name, definition in definitions.items():
+                    if column_name not in existing:
+                        connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}"))
+    except SQLAlchemyError as exc:
+        print(f"WARNING: Form 4 workflow column migration skipped: {exc}")
+
+
+def _backfill_legacy_audit_hashes() -> None:
+    db = SessionLocal()
+    try:
+        logs = db.query(models.AuditLog).order_by(models.AuditLog.id.asc()).all()
+        if not logs or any(log.record_hash for log in logs):
+            return
+
+        previous_hash = None
+        for log in logs:
+            log.hash_algorithm = AUDIT_HASH_ALGORITHM
+            log.hash_payload_version = AUDIT_HASH_PAYLOAD_VERSION
+            log.previous_hash = previous_hash
+            log.record_hash = _calculate_audit_hash(log)
+            previous_hash = log.record_hash
+        db.commit()
+    except SQLAlchemyError as exc:
+        db.rollback()
+        print(f"WARNING: legacy audit hash backfill skipped: {exc}")
+    finally:
+        db.close()
+
+
 def get_application() -> FastAPI:
     try:
         models.Base.metadata.create_all(bind=engine)
+        _ensure_audit_log_hash_columns()
+        _ensure_form4_workflow_columns()
+        _backfill_legacy_audit_hashes()
     except SQLAlchemyError as exc:
         print(f"WARNING: database table initialization skipped: {exc}")
 
@@ -100,17 +303,14 @@ def _record_audit_log(
     action: str,
     status_value: str,
 ):
-    client_ip = request.client.host if request.client else "Unknown"
-    user_agent = request.headers.get("user-agent", "Unknown")
-
-    db.add(
-        models.AuditLog(
-            user_email=user_email,
-            action=action,
-            status=status_value,
-            ip_address=client_ip,
-            browser_info=user_agent,
-        )
+    client_ip, user_agent = _audit_context(request)
+    _append_audit_log(
+        db,
+        user_email=user_email,
+        action=action,
+        status_value=status_value,
+        ip_address=client_ip,
+        browser_info=user_agent,
     )
     db.commit()
 
@@ -152,17 +352,15 @@ def get_current_admin(
     db: Session = Depends(get_db),
 ):
     if current_user.role != "admin":
-        client_ip = request.client.host if request.client else "Unknown"
-        user_agent = request.headers.get("user-agent", "Unknown")
-
-        log = models.AuditLog(
+        client_ip, user_agent = _audit_context(request)
+        _append_audit_log(
+            db,
             user_email=current_user.email,
             action="UNAUTHORIZED_ACCESS",
-            status="FAILED",
+            status_value="FAILED",
             ip_address=client_ip,
             browser_info=user_agent,
         )
-        db.add(log)
         db.commit()
 
         raise HTTPException(
@@ -178,20 +376,19 @@ def register_user(request: Request, user: schemas.UserCreate, db: Session = Depe
     normalized_email = user.email.strip().lower()
     
     # Menangkap IP Address dan User Agent untuk keperluan audit
-    client_ip = request.client.host if request.client else "Unknown"
-    user_agent = request.headers.get("user-agent", "Unknown")
+    client_ip, user_agent = _audit_context(request)
 
     # 1. Gagal karena Email Sudah Terdaftar
     existing_user = db.query(models.User).filter(models.User.email == normalized_email).first()
     if existing_user:
-        failed_log = models.AuditLog(
+        _append_audit_log(
+            db,
             user_email=normalized_email,
             action="USER_REGISTRATION",
-            status="FAILED",
+            status_value="FAILED",
             ip_address=client_ip,
             browser_info=user_agent
         )
-        db.add(failed_log)
         db.commit()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -202,14 +399,14 @@ def register_user(request: Request, user: schemas.UserCreate, db: Session = Depe
     allowed_domains = ["sakafarma.com", "gmail.com", "president.ac.id", "student.president.ac.id"]
     email_domain = normalized_email.split("@")[-1] if "@" in normalized_email else ""
     if email_domain not in allowed_domains:
-        failed_log = models.AuditLog(
+        _append_audit_log(
+            db,
             user_email=normalized_email,
             action="USER_REGISTRATION",
-            status="FAILED",
+            status_value="FAILED",
             ip_address=client_ip,
             browser_info=user_agent
         )
-        db.add(failed_log)
         db.commit()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -217,23 +414,20 @@ def register_user(request: Request, user: schemas.UserCreate, db: Session = Depe
         )
 
     # 3. Gagal karena Kompleksitas Password Kurang
-    has_uppercase = re.search(r"[A-Z]", user.password)
-    has_number = re.search(r"[0-9]", user.password)
-    has_symbol = re.search(r"[^A-Za-z0-9]", user.password)
-
-    if len(user.password) < 8 or len(user.password) > 20 or not has_uppercase or not has_number or not has_symbol:
-        failed_log = models.AuditLog(
+    password_error = _password_policy_error(user.password)
+    if password_error:
+        _append_audit_log(
+            db,
             user_email=normalized_email,
             action="USER_REGISTRATION",
-            status="FAILED",
+            status_value="FAILED",
             ip_address=client_ip,
             browser_info=user_agent
         )
-        db.add(failed_log)
         db.commit()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must be at least 8 characters long and contain uppercase letters, numbers, and symbols.",
+            detail=password_error,
         )
 
     print(f"--- DEBUG: Security validation passed for user: {normalized_email} ---")
@@ -247,14 +441,14 @@ def register_user(request: Request, user: schemas.UserCreate, db: Session = Depe
     db.add(new_user)
     
     # 4. Sukses Registrasi (Catat log status SUCCESS)
-    success_log = models.AuditLog(
+    _append_audit_log(
+        db,
         user_email=normalized_email,
         action="USER_REGISTRATION",
-        status="SUCCESS",
+        status_value="SUCCESS",
         ip_address=client_ip,
         browser_info=user_agent
     )
-    db.add(success_log)
     
     db.commit()
     db.refresh(new_user)
@@ -279,18 +473,17 @@ def login(
     normalized_email = user_credentials.username.strip().lower()
     user = db.query(models.User).filter(models.User.email == normalized_email).first()
 
-    client_ip = request.client.host if request.client else "Unknown"
-    user_agent = request.headers.get("user-agent", "Unknown")
+    client_ip, user_agent = _audit_context(request)
 
     if not user or not security.verify_password(user_credentials.password, user.hashed_password):
-        failed_log = models.AuditLog(
+        _append_audit_log(
+            db,
             user_email=normalized_email,
             action="USER_LOGIN",
-            status="FAILED",
+            status_value="FAILED",
             ip_address=client_ip,
             browser_info=user_agent,
         )
-        db.add(failed_log)
         db.commit()
 
         raise HTTPException(
@@ -300,14 +493,14 @@ def login(
         )
 
     if not user.is_active:
-        failed_log = models.AuditLog(
+        _append_audit_log(
+            db,
             user_email=user.email,
             action="USER_LOGIN",
-            status="FAILED_INACTIVE",
+            status_value="FAILED_INACTIVE",
             ip_address=client_ip,
             browser_info=user_agent,
         )
-        db.add(failed_log)
         db.commit()
 
         raise HTTPException(
@@ -315,14 +508,14 @@ def login(
             detail="User account is inactive",
         )
 
-    success_log = models.AuditLog(
+    _append_audit_log(
+        db,
         user_email=user.email,
         action="USER_LOGIN",
-        status="SUCCESS",
+        status_value="SUCCESS",
         ip_address=client_ip,
         browser_info=user_agent,
     )
-    db.add(success_log)
     db.commit()
 
     access_token = security.create_access_token(
@@ -337,17 +530,15 @@ def logout(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    client_ip = request.client.host if request.client else "Unknown"
-    user_agent = request.headers.get("user-agent", "Unknown")
-
-    log = models.AuditLog(
+    client_ip, user_agent = _audit_context(request)
+    _append_audit_log(
+        db,
         user_email=current_user.email,
         action="USER_LOGOUT",
-        status="SUCCESS",
+        status_value="SUCCESS",
         ip_address=client_ip,
         browser_info=user_agent,
     )
-    db.add(log)
     db.commit()
 
     return {"message": "Logged out successfully"}
@@ -359,8 +550,7 @@ async def forgot_password(
     body: schemas.ForgotPasswordRequest,
     db: Session = Depends(get_db),
 ):
-    client_ip = request.client.host if request.client else "Unknown"
-    user_agent = request.headers.get("user-agent", "Unknown")
+    client_ip, user_agent = _audit_context(request)
     normalized_email = body.email.strip().lower()
 
     user = db.query(models.User).filter(models.User.email == normalized_email).first()
@@ -398,23 +588,24 @@ async def forgot_password(
         fm = FastMail(config=conf)
         await fm.send_message(message)
 
-        log = models.AuditLog(
+        _append_audit_log(
+            db,
             user_email=user.email,
             action="OTP_SENT",
-            status="SUCCESS",
+            status_value="SUCCESS",
             ip_address=client_ip,
             browser_info=user_agent,
         )
     else:
-        log = models.AuditLog(
+        _append_audit_log(
+            db,
             user_email=normalized_email,
             action="OTP_REQ_FAILED",
-            status="FAILED",
+            status_value="FAILED",
             ip_address=client_ip,
             browser_info=user_agent,
         )
 
-    db.add(log)
     db.commit()
 
     return {"message": "If this email is registered, an OTP code has been sent."}
@@ -426,8 +617,7 @@ def reset_password(
     data: schemas.ResetPassword, # Ini otomatis akan membaca email, otp, dan new_password dari schemas.py
     db: Session = Depends(get_db),
 ):
-    client_ip = request.client.host if request.client else "Unknown"
-    user_agent = request.headers.get("user-agent", "Unknown")
+    client_ip, user_agent = _audit_context(request)
     normalized_email = data.email.strip().lower()
 
     # Cari user berdasarkan email
@@ -444,6 +634,10 @@ def reset_password(
     if user.reset_otp_expire is None or datetime.utcnow() > user.reset_otp_expire:
         raise HTTPException(status_code=400, detail="OTP code has expired. Please request a new one.")
 
+    password_error = _password_policy_error(data.new_password)
+    if password_error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=password_error)
+
     # Jika lolos validasi, update password
     user.hashed_password = security.get_password_hash(data.new_password)
     
@@ -451,14 +645,14 @@ def reset_password(
     user.reset_otp = None
     user.reset_otp_expire = None
     
-    reset_log = models.AuditLog(
+    _append_audit_log(
+        db,
         user_email=user.email,
         action="PASSWORD_RESET_SUCCESS",
-        status="SUCCESS",
+        status_value="SUCCESS",
         ip_address=client_ip,
         browser_info=user_agent,
     )
-    db.add(reset_log)
     db.commit()
 
     return {"message": "Password updated successfully. You can now login."}
@@ -472,6 +666,14 @@ def get_audit_logs(
     return db.query(models.AuditLog).order_by(models.AuditLog.timestamp.desc()).all()
 
 
+@app.get("/api/audit-logs/verify")
+def verify_audit_logs(
+    current_user: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    return _verify_audit_hash_chain(db)
+
+
 @app.get("/api/audit-logs/export")
 def export_audit_logs(
     current_user: models.User = Depends(get_current_admin),
@@ -481,7 +683,21 @@ def export_audit_logs(
 
     stream = io.StringIO()
     csv_writer = csv.writer(stream)
-    csv_writer.writerow(["ID", "Timestamp (UTC)", "User Email", "Action", "Status", "IP Address", "Browser Info"])
+    csv_writer.writerow(
+        [
+            "ID",
+            "Timestamp (UTC)",
+            "User Email",
+            "Action",
+            "Status",
+            "IP Address",
+            "Browser Info",
+            "Record Hash",
+            "Previous Hash",
+            "Hash Algorithm",
+            "Hash Payload Version",
+        ]
+    )
 
     for log in logs:
         time_str = log.timestamp.strftime("%Y-%m-%d %H:%M:%S") if log.timestamp else "N/A"
@@ -494,6 +710,10 @@ def export_audit_logs(
                 log.status,
                 log.ip_address or "N/A",
                 log.browser_info or "N/A",
+                log.record_hash or "N/A",
+                log.previous_hash or "N/A",
+                log.hash_algorithm or "N/A",
+                log.hash_payload_version or "N/A",
             ]
         )
 
@@ -517,17 +737,15 @@ def update_user_preferences(
 ):
     current_user.email_notifications = preferences.email_notifications
 
-    client_ip = request.client.host if request.client else "Unknown"
-    user_agent = request.headers.get("user-agent", "Unknown")
-
-    log = models.AuditLog(
+    client_ip, user_agent = _audit_context(request)
+    _append_audit_log(
+        db,
         user_email=current_user.email,
         action="PREFERENCES_UPDATED",
-        status="SUCCESS",
+        status_value="SUCCESS",
         ip_address=client_ip,
         browser_info=user_agent,
     )
-    db.add(log)
     db.commit()
 
     return {
@@ -536,7 +754,7 @@ def update_user_preferences(
     }
 
 # ==========================================
-# --- MAINTENANCE TICKET ENDPOINTS (E2EE) ---
+# --- AUDITED MAINTENANCE TICKET ENDPOINTS ---
 # ==========================================
 
 @app.post("/api/tickets", response_model=schemas.MaintenanceTicketResponse, status_code=status.HTTP_201_CREATED)
@@ -544,34 +762,32 @@ def create_maintenance_ticket(
     request: Request,
     ticket: schemas.MaintenanceTicketCreate,
     current_user: models.User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """
-    Receives a new maintenance ticket from the frontend dashboard.
-    The 'issue_description' field must be pre-encrypted using End-to-End Encryption (E2EE)
-    before being transmitted to this endpoint.
-    """
-    # Initialize and save the encrypted ticket payload to MariaDB
+    if ticket.anomaly_event_id is not None:
+        linked_event = db.query(models.AnomalyEvent).filter(models.AnomalyEvent.id == ticket.anomaly_event_id).first()
+        if linked_event is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Linked anomaly event was not found.")
+
     new_ticket = models.MaintenanceTicket(
+        anomaly_event_id=ticket.anomaly_event_id,
         machine_id=ticket.machine_id,
-        issue_description=ticket.issue_description,  # Stores the raw AES ciphertext safely
+        issue_description=ticket.issue_description,
         reported_by=current_user.email,
-        status="Open"
+        status="OPEN",
     )
     db.add(new_ticket)
-    
-    # Log the security event into the centralized audit trail system
+
     _record_audit_log(
         db,
         request=request,
         user_email=current_user.email,
-        action="CREATE_MAINTENANCE_TICKET",
-        status_value="SUCCESS"
+        action="TICKET_CREATE",
+        status_value="SUCCESS",
     )
-    
+
     db.commit()
     db.refresh(new_ticket)
-    
     return new_ticket
 
 
@@ -579,36 +795,56 @@ def create_maintenance_ticket(
 def get_maintenance_tickets(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_user),
 ):
-    """
-    Fetches the complete history of maintenance logs from the database.
-    Results are automatically sorted by the most recent timestamp.
-    Decryption of encrypted payloads will handle strictly on the client-side.
-    """
-    # Log the access attempt into the security audit trail
     _record_audit_log(
         db,
         request=request,
         user_email=current_user.email,
-        action="VIEW_MAINTENANCE_TICKETS",
-        status_value="SUCCESS"
+        action="TICKETS_VIEW",
+        status_value="SUCCESS",
     )
-    
-    # Query all records from the maintenance_tickets table ordered by descending time
-    tickets = db.query(models.MaintenanceTicket).order_by(models.MaintenanceTicket.timestamp.desc()).all()
-    
-    return tickets
 
-def get_maintenance_tickets(
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    """
-    This endpoint retrieves the entire ticket history from the database, 
-    sorted from the most recent.    
-    """
     return db.query(models.MaintenanceTicket).order_by(models.MaintenanceTicket.timestamp.desc()).all()
+
+
+@app.patch("/api/tickets/{ticket_id}/status", response_model=schemas.MaintenanceTicketResponse)
+def update_maintenance_ticket_status(
+    ticket_id: int,
+    request: Request,
+    update: schemas.MaintenanceTicketStatusUpdate,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    ticket = db.query(models.MaintenanceTicket).filter(models.MaintenanceTicket.id == ticket_id).first()
+    if ticket is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Maintenance ticket was not found.")
+
+    if update.status not in VALID_TICKET_STATUSES:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid maintenance ticket status.")
+    if update.status == "RESOLVED" and not update.resolution_note:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Resolution note is required to resolve a ticket.")
+
+    ticket.status = update.status
+    ticket.updated_at = datetime.now(timezone.utc)
+    if update.resolution_note is not None:
+        ticket.resolution_note = update.resolution_note
+    if update.status == "RESOLVED":
+        ticket.resolved_at = datetime.now(timezone.utc)
+    elif update.status in {"OPEN", "IN_REVIEW"}:
+        ticket.resolved_at = None
+
+    _record_audit_log(
+        db,
+        request=request,
+        user_email=current_user.email,
+        action="TICKET_STATUS_UPDATE",
+        status_value=update.status,
+    )
+
+    db.commit()
+    db.refresh(ticket)
+    return ticket
 
 # ==========================================
 # --- TEAMMATE ML & TELEMETRY ENDPOINTS ---
@@ -726,6 +962,63 @@ def get_motor_telemetry(
     return data
 
 
+def _read_threshold_override(db: Session) -> models.RuntimeSetting | None:
+    return db.query(models.RuntimeSetting).filter(models.RuntimeSetting.key == THRESHOLD_OVERRIDE_KEY).first()
+
+
+def _threshold_state(db: Session) -> dict:
+    artifact_threshold: float | None = None
+    metadata = inference_service.metadata()
+    metadata_threshold = metadata.get("threshold")
+    if metadata_threshold is not None:
+        artifact_threshold = float(metadata_threshold)
+    else:
+        artifact_threshold = float(inference_service.threshold())
+
+    artifact_policy = metadata.get("threshold_policy", "artifact threshold baseline")
+    override = _read_threshold_override(db)
+    if override:
+        try:
+            override_payload = json.loads(override.value_json)
+            override_threshold = float(override_payload["threshold"])
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+            override_threshold = None
+        if override_threshold and override_threshold > 0:
+            reason = override.reason or "No reason recorded"
+            return {
+                "threshold": override_threshold,
+                "threshold_policy": f"Admin runtime override: {reason}",
+                "threshold_source": "admin_override",
+                "artifact_threshold": artifact_threshold,
+                "override_active": True,
+                "reason": override.reason,
+                "updated_by": override.updated_by,
+                "updated_at": override.updated_at,
+            }
+
+    return {
+        "threshold": artifact_threshold,
+        "threshold_policy": artifact_policy,
+        "threshold_source": "artifact_baseline",
+        "artifact_threshold": artifact_threshold,
+        "override_active": False,
+        "reason": None,
+        "updated_by": None,
+        "updated_at": None,
+    }
+
+
+def _apply_effective_threshold(db: Session, prediction: dict) -> dict:
+    threshold_state = _threshold_state(db)
+    threshold = float(threshold_state["threshold"])
+    effective_prediction = dict(prediction)
+    effective_prediction["threshold"] = threshold
+    effective_prediction["is_anomaly"] = float(prediction["reconstruction_error"]) > threshold
+    effective_prediction["threshold_policy"] = threshold_state["threshold_policy"]
+    effective_prediction["threshold_source"] = threshold_state["threshold_source"]
+    return effective_prediction
+
+
 def _anomaly_severity(reconstruction_error: float, threshold: float, is_anomaly: bool) -> str:
     if not is_anomaly:
         return "normal"
@@ -793,6 +1086,7 @@ def _save_anomaly_event(
         is_anomaly=prediction["is_anomaly"],
         severity=severity,
         threshold_policy=prediction["threshold_policy"],
+        threshold_source=prediction.get("threshold_source", "artifact_baseline"),
         model_version=prediction["model_version"],
         details=json.dumps(
             {
@@ -828,6 +1122,7 @@ def _prediction_response(
         "is_anomaly": prediction["is_anomaly"],
         "severity": severity,
         "threshold_policy": prediction["threshold_policy"],
+        "threshold_source": prediction.get("threshold_source", "artifact_baseline"),
         "window_size": prediction["window_size"],
         "features": prediction["features"],
         "model_version": prediction["model_version"],
@@ -870,6 +1165,8 @@ def read_latest_telemetry(
 def read_alerts(
     request: Request,
     machine_id: str = "PMA Granulator #01",
+    severity: str | None = None,
+    acknowledgement_status: str | None = None,
     limit: int = 50,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -883,13 +1180,113 @@ def read_alerts(
     )
 
     safe_limit = max(1, min(limit, 200))
-    return (
+    query = db.query(models.AnomalyEvent).filter(models.AnomalyEvent.machine_id == machine_id)
+    if severity and severity != "all":
+        query = query.filter(models.AnomalyEvent.severity == severity)
+    if acknowledgement_status == "acknowledged":
+        query = query.filter(models.AnomalyEvent.acknowledged_at.isnot(None))
+    elif acknowledgement_status == "unacknowledged":
+        query = query.filter(models.AnomalyEvent.acknowledged_at.is_(None))
+    return query.order_by(models.AnomalyEvent.timestamp.desc()).limit(safe_limit).all()
+
+
+@app.post("/api/alerts/{alert_id}/acknowledge", response_model=schemas.AlertResponse)
+def acknowledge_alert(
+    alert_id: int,
+    request: Request,
+    body: schemas.AlertAcknowledgeRequest,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    alert = db.query(models.AnomalyEvent).filter(models.AnomalyEvent.id == alert_id).first()
+    if alert is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert event was not found.")
+
+    alert.acknowledged_at = datetime.now(timezone.utc)
+    alert.acknowledged_by = current_user.email
+    alert.acknowledgement_note = body.note
+
+    _record_audit_log(
+        db,
+        request=request,
+        user_email=current_user.email,
+        action="ALERT_ACKNOWLEDGE",
+        status_value="SUCCESS",
+    )
+
+    db.commit()
+    db.refresh(alert)
+    return alert
+
+
+@app.get("/api/alerts/export")
+def export_alerts(
+    request: Request,
+    machine_id: str = "PMA Granulator #01",
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _record_audit_log(
+        db,
+        request=request,
+        user_email=current_user.email,
+        action="ALERT_REPORT_EXPORT",
+        status_value="SUCCESS",
+    )
+
+    alerts = (
         db.query(models.AnomalyEvent)
         .filter(models.AnomalyEvent.machine_id == machine_id)
         .order_by(models.AnomalyEvent.timestamp.desc())
-        .limit(safe_limit)
         .all()
     )
+    ticket_rows = db.query(models.MaintenanceTicket).all()
+    tickets_by_alert: dict[int, list[models.MaintenanceTicket]] = {}
+    for ticket in ticket_rows:
+        if ticket.anomaly_event_id is not None:
+            tickets_by_alert.setdefault(ticket.anomaly_event_id, []).append(ticket)
+
+    stream = io.StringIO()
+    csv_writer = csv.writer(stream)
+    csv_writer.writerow(
+        [
+            "Alert ID",
+            "Timestamp",
+            "Machine ID",
+            "Severity",
+            "Reconstruction Error",
+            "Threshold",
+            "Threshold Source",
+            "Acknowledged At",
+            "Acknowledged By",
+            "Acknowledgement Note",
+            "Linked Ticket IDs",
+            "Linked Ticket Statuses",
+        ]
+    )
+    for alert in alerts:
+        linked_tickets = tickets_by_alert.get(alert.id, [])
+        csv_writer.writerow(
+            [
+                alert.id,
+                alert.timestamp.isoformat() if alert.timestamp else "",
+                alert.machine_id,
+                alert.severity,
+                alert.reconstruction_error,
+                alert.threshold,
+                alert.threshold_source,
+                alert.acknowledged_at.isoformat() if alert.acknowledged_at else "",
+                alert.acknowledged_by or "",
+                alert.acknowledgement_note or "",
+                ";".join(str(ticket.id) for ticket in linked_tickets),
+                ";".join(ticket.status for ticket in linked_tickets),
+            ]
+        )
+
+    stream.seek(0)
+    response = StreamingResponse(iter([stream.getvalue()]), media_type="text/csv")
+    response.headers["Content-Disposition"] = "attachment; filename=spms_alert_report.csv"
+    return response
 
 
 @app.post("/api/predict/anomaly", response_model=schemas.AnomalyPredictionResponse)
@@ -905,7 +1302,7 @@ def predict_anomaly(
             expected_window=inference_service.window_size(),
             feature_names=inference_service.feature_names(),
         )
-        prediction = inference_service.predict_window(window)
+        prediction = _apply_effective_threshold(db, inference_service.predict_window(window))
     except WindowValidationError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     except RuntimeError as exc:
@@ -956,7 +1353,7 @@ def predict_latest_anomaly(
             feature_names=inference_service.feature_names(),
             machine_id=machine_id,
         )
-        prediction = inference_service.predict_window(window_payload["rows"])
+        prediction = _apply_effective_threshold(db, inference_service.predict_window(window_payload["rows"]))
     except WindowValidationError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     except WindowSourceUnavailable as exc:
@@ -995,6 +1392,115 @@ def predict_latest_anomaly(
     )
 
 
+@app.get("/api/settings/threshold", response_model=schemas.ThresholdSettingResponse)
+def read_threshold_setting(
+    request: Request,
+    current_user: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    _record_audit_log(
+        db,
+        request=request,
+        user_email=current_user.email,
+        action="THRESHOLD_OVERRIDE_VIEW",
+        status_value="SUCCESS",
+    )
+    return _threshold_state(db)
+
+
+@app.patch("/api/settings/threshold", response_model=schemas.ThresholdSettingResponse)
+def update_threshold_setting(
+    request: Request,
+    update: schemas.ThresholdSettingUpdate,
+    current_user: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    setting = _read_threshold_override(db)
+    payload = json.dumps({"threshold": update.threshold}, separators=(",", ":"))
+    if setting is None:
+        setting = models.RuntimeSetting(key=THRESHOLD_OVERRIDE_KEY, value_json=payload)
+        db.add(setting)
+    else:
+        setting.value_json = payload
+    setting.reason = update.reason
+    setting.updated_by = current_user.email
+    setting.updated_at = datetime.now(timezone.utc)
+
+    _record_audit_log(
+        db,
+        request=request,
+        user_email=current_user.email,
+        action="THRESHOLD_OVERRIDE_UPDATE",
+        status_value="SUCCESS",
+    )
+
+    db.commit()
+    return _threshold_state(db)
+
+
+@app.delete("/api/settings/threshold", response_model=schemas.ThresholdSettingResponse)
+def reset_threshold_setting(
+    request: Request,
+    current_user: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    setting = _read_threshold_override(db)
+    if setting is not None:
+        db.delete(setting)
+
+    _record_audit_log(
+        db,
+        request=request,
+        user_email=current_user.email,
+        action="THRESHOLD_OVERRIDE_RESET",
+        status_value="SUCCESS",
+    )
+
+    db.commit()
+    return _threshold_state(db)
+
+
+@app.get("/api/system/status", response_model=schemas.SystemStatusResponse)
+def read_system_status(
+    request: Request,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    database_status = {"connected": False, "detail": "Unavailable"}
+    try:
+        db.execute(text("SELECT 1"))
+        database_status = {"connected": True, "detail": "SELECT 1 succeeded"}
+    except SQLAlchemyError as exc:
+        database_status = {"connected": False, "detail": str(exc)}
+
+    telemetry_status = {"available": False, "source": None, "detail": "No telemetry rows returned"}
+    try:
+        rows = _latest_telemetry_rows(db, machine_id="PMA Granulator #01", limit=1)
+        if rows:
+            telemetry_status = {"available": True, "source": "pma_l1_or_fallback", "detail": "Latest telemetry row returned"}
+    except Exception as exc:
+        telemetry_status = {"available": False, "source": None, "detail": str(exc)}
+
+    payload = {
+        "checked_at": datetime.now(timezone.utc),
+        "database": database_status,
+        "ml_artifacts": inference_service.readiness_status(),
+        "threshold": _threshold_state(db),
+        "audit_chain": _verify_audit_hash_chain(db),
+        "telemetry_source": telemetry_status,
+    }
+
+    _record_audit_log(
+        db,
+        request=request,
+        user_email=current_user.email,
+        action="SYSTEM_STATUS_VIEW",
+        status_value="SUCCESS",
+    )
+
+    return payload
+
+
 @app.get("/api/dashboard/summary", response_model=schemas.DashboardSummary)
 def read_dashboard_summary(
     request: Request,
@@ -1027,8 +1533,9 @@ def read_dashboard_summary(
     )
 
     metadata = inference_service.metadata()
-    threshold = metadata.get("threshold")
-    threshold_policy = metadata.get("threshold_policy", "unknown")
+    threshold_state = _threshold_state(db)
+    threshold = threshold_state["threshold"]
+    threshold_policy = threshold_state["threshold_policy"]
 
     if latest_prediction is None:
         machine_status = "NO DATA"
@@ -1046,6 +1553,8 @@ def read_dashboard_summary(
         "latest_prediction": latest_prediction,
         "threshold": threshold,
         "threshold_policy": threshold_policy,
+        "threshold_source": threshold_state["threshold_source"],
+        "artifact_threshold": threshold_state["artifact_threshold"],
         "valid_window_count": metadata.get("valid_window_count"),
         "skipped_window_count": metadata.get("skipped_window_count"),
         "artifact_status": inference_service.readiness_status(),

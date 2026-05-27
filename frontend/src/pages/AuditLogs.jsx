@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { fetchBlobWithAuth, fetchJsonWithAuth } from '../utils/api';
-import CryptoJS from 'crypto-js'; 
 
 const AuditLogs = () => {
   const [logs, setLogs] = useState([]);
@@ -12,9 +11,8 @@ const AuditLogs = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [isExporting, setIsExporting] = useState(false);
-  
-  // State untuk tombol Verify SHA-256
-  const [isVerified, setIsVerified] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationResult, setVerificationResult] = useState(null);
 
   useEffect(() => {
     const fetchLogs = async () => {
@@ -79,10 +77,27 @@ const AuditLogs = () => {
     }
   };
 
-  // Fungsi Hash SHA-256 untuk mendemonstrasikan Anti-Tampering
-  const generateHash = (log) => {
-    const dataString = `${log.id}-${log.timestamp}-${log.user_email}-${log.action}-${log.status}`;
-    return CryptoJS.SHA256(dataString).toString(CryptoJS.enc.Hex).substring(0, 16) + "...";
+  const handleVerify = async () => {
+    setIsVerifying(true);
+    try {
+      const data = await fetchJsonWithAuth('/api/audit-logs/verify');
+      setVerificationResult(data);
+    } catch (err) {
+      setVerificationResult({
+        overall_status: 'COMPROMISED',
+        invalid_log_ids: [],
+        detail: err.message,
+      });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const showHashColumn = Boolean(verificationResult);
+  const verified = verificationResult?.overall_status === 'VERIFIED';
+  const hashPreview = (value) => {
+    if (!value) return 'N/A';
+    return `${value.slice(0, 16)}...`;
   };
 
   return (
@@ -97,20 +112,22 @@ const AuditLogs = () => {
           <p className="text-subtitle mt-2">Authenticated backend audit events recorded by the FastAPI service.</p>
         </div>
         <div className="flex items-center gap-3">
-          {/* Tombol Verify SHA-256 diselipkan di sini */}
           {!accessDenied && (
             <button 
-              onClick={() => setIsVerified(!isVerified)}
+              onClick={handleVerify}
+              disabled={isVerifying}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
-                isVerified 
-                  ? 'bg-[#1b263b] text-[#6bfe9c] border border-transparent' 
+                verified
+                  ? 'bg-[#1b263b] text-[#6bfe9c] border border-transparent'
+                  : verificationResult
+                    ? 'bg-[#ba1a1a] text-white border border-transparent'
                   : 'bg-white text-[#1b263b] border border-[#c5c6cd]/40 hover:bg-[#f1f4f3]'
               }`}
             >
               <span className="material-symbols-outlined text-base">
-                {isVerified ? 'verified_user' : 'policy'}
+                {verified ? 'verified_user' : 'policy'}
               </span>
-              {isVerified ? 'Verified' : 'Verify SHA-256'}
+              {isVerifying ? 'Verifying...' : verified ? 'Backend Verified' : 'Verify SHA-256'}
             </button>
           )}
           <span className="flex items-center gap-2 text-[10px] font-black text-[#2ecc71] bg-[#2ecc71]/10 px-4 py-2 rounded-sm border border-[#2ecc71]/20 tracking-widest">
@@ -163,6 +180,35 @@ const AuditLogs = () => {
         </div>
       )}
 
+      {!accessDenied && verificationResult && (
+        <div className={`p-4 mb-6 rounded-lg border text-sm ${
+          verified
+            ? 'bg-[#2ecc71]/10 border-[#2ecc71]/30 text-[#00743a]'
+            : 'bg-[#ba1a1a]/10 border-[#ba1a1a]/20 text-[#ba1a1a]'
+        }`}>
+          <div className="flex items-start gap-3">
+            <span className="material-symbols-outlined">{verified ? 'verified_user' : 'report'}</span>
+            <div>
+              <p className="font-black uppercase tracking-widest text-[11px]">
+                Backend SHA-256 chain verification: {verificationResult.overall_status}
+              </p>
+              <p className="mt-1 font-medium">
+                Checked {verificationResult.total_logs_checked ?? 0} logs, {verificationResult.valid_count ?? 0} valid.
+                {verificationResult.invalid_log_ids?.length
+                  ? ` Invalid IDs: ${verificationResult.invalid_log_ids.join(', ')}.`
+                  : ' No tampered log IDs reported.'}
+              </p>
+              {verificationResult.detail && <p className="mt-1">{verificationResult.detail}</p>}
+              {verificationResult.chain_head_hash && (
+                <p className="mt-2 font-mono text-[11px] break-all">
+                  Chain head: {verificationResult.chain_head_hash}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {accessDenied && (
         <div className="panel-card border-l-4 border-l-[#ba1a1a]">
           <div className="flex items-start gap-4">
@@ -188,14 +234,14 @@ const AuditLogs = () => {
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#75777d]">Security Event</th>
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#75777d]">Source IP</th>
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#75777d]">Outcome</th>
-              {isVerified && <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#2ecc71]">SHA-256 Fingerprint</th>}
+              {showHashColumn && <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#2ecc71]">Backend Record Hash</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-[#ebeeed]">
             {isLoading ? (
-              <tr><td colSpan={isVerified ? "6" : "5"} className="text-center py-20 text-sm text-[#75777d] italic">Loading audit logs...</td></tr>
+              <tr><td colSpan={showHashColumn ? "6" : "5"} className="text-center py-20 text-sm text-[#75777d] italic">Loading audit logs...</td></tr>
             ) : currentLogs.length === 0 ? (
-              <tr><td colSpan={isVerified ? "6" : "5"} className="text-center py-20 text-sm text-[#75777d]">No audit events found matching current filters.</td></tr>
+              <tr><td colSpan={showHashColumn ? "6" : "5"} className="text-center py-20 text-sm text-[#75777d]">No audit events found matching current filters.</td></tr>
             ) : (
               currentLogs.map((log) => (
                 <tr key={log.id} className="hover:bg-[#f9fafb] transition-colors group">
@@ -226,10 +272,10 @@ const AuditLogs = () => {
                       {log.status}
                     </span>
                   </td>
-                  {isVerified && (
+                  {showHashColumn && (
                     <td className="px-6 py-5">
                       <span className="font-mono text-[10px] text-[#45474d] bg-[#f1f4f3] px-2 py-1 rounded border border-[#c5c6cd]/50 shadow-inner">
-                        {generateHash(log)}
+                        {hashPreview(log.record_hash)}
                       </span>
                     </td>
                   )}

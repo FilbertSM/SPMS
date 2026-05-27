@@ -28,6 +28,11 @@ class MlArtifactsAndRoutesTests(unittest.TestCase):
         self.assertIn("/api/predict/anomaly", paths)
         self.assertIn("/api/dashboard/summary", paths)
         self.assertIn("/api/telemetry/latest", paths)
+        self.assertIn("/api/alerts/{alert_id}/acknowledge", paths)
+        self.assertIn("/api/alerts/export", paths)
+        self.assertIn("/api/tickets/{ticket_id}/status", paths)
+        self.assertIn("/api/settings/threshold", paths)
+        self.assertIn("/api/system/status", paths)
 
     def test_ml_artifacts_and_metadata_are_ready(self):
         status = inference_service.artifact_status()

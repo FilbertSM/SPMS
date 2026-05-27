@@ -242,21 +242,24 @@ const Dashboard = () => {
               <span className="material-symbols-outlined text-sm">history</span>
               View PMA Data
             </Link>
-            <button
-              disabled
-              title="Manual workflow only in the Form 4 demo"
-              className="px-6 py-3 bg-[#e6e9e8] text-[#45474d] text-xs font-bold uppercase tracking-widest rounded-lg flex items-center gap-2 cursor-not-allowed opacity-70"
+            <Link
+              to="/app/maintenance"
+              state={{
+                machineId: summary?.machine_id || 'PMA Granulator #01',
+                anomalyEventId: latestPrediction?.id || null,
+                prefill: latestPrediction
+                  ? `Latest prediction ${latestPrediction.severity}: score ${formatNumber(latestPrediction.reconstruction_error, 3)} against threshold ${formatNumber(latestPrediction.threshold, 3)}.`
+                  : 'Maintenance follow-up for PMA Granulator monitoring review.',
+              }}
+              className="btn-secondary px-5 py-3 justify-center"
             >
               <span className="material-symbols-outlined text-sm">medical_services</span>
-              Log Maintenance Ticket
-            </button>
+              Log Ticket
+            </Link>
           </div>
-          <p className="mt-3 text-[11px] font-medium text-[#45474d]">
-            Maintenance tickets are recorded manually in this demo.
+          <p className="mt-3 text-[11px] font-bold text-[#45474d]">
+            Tickets record human review only and do not control the PMA Granulator.
           </p>
-          <Form4Warning className="mt-4">
-            UNFINISHED DEMO SECTION. The maintenance-ticket action is disabled because backend ticket creation is not implemented for Form 4.
-          </Form4Warning>
           {inferenceState.error && (
             <div className="mt-4 rounded-lg bg-[#ffdad6] px-4 py-3 text-xs font-bold text-[#ba1a1a]">
               Latest inference failed: {inferenceState.error}

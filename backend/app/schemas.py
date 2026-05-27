@@ -74,6 +74,7 @@ class AnomalyPredictionResponse(BaseModel):
     is_anomaly: bool
     severity: str
     threshold_policy: str
+    threshold_source: str = "artifact_baseline"
     window_size: int
     features: list[str]
     model_version: str
@@ -92,11 +93,19 @@ class AlertResponse(BaseModel):
     is_anomaly: bool
     severity: str
     threshold_policy: str | None = None
+    threshold_source: str | None = None
     model_version: str | None = None
     details: str | None = None
+    acknowledged_at: datetime | None = None
+    acknowledged_by: str | None = None
+    acknowledgement_note: str | None = None
 
     class Config:
         from_attributes = True
+
+
+class AlertAcknowledgeRequest(BaseModel):
+    note: str | None = Field(default=None, max_length=1000)
 
 
 class DashboardSummary(BaseModel):
@@ -106,6 +115,8 @@ class DashboardSummary(BaseModel):
     latest_prediction: AlertResponse | None
     threshold: float | None
     threshold_policy: str
+    threshold_source: str
+    artifact_threshold: float | None = None
     valid_window_count: int | None
     skipped_window_count: int | None
     artifact_status: dict[str, Any]
@@ -114,14 +125,49 @@ class DashboardSummary(BaseModel):
 class MaintenanceTicketCreate(BaseModel):
     machine_id: str
     issue_description: str
+    anomaly_event_id: int | None = None
 
 class MaintenanceTicketResponse(BaseModel):
     id: int
+    anomaly_event_id: int | None = None
     machine_id: str
     issue_description: str
+    resolution_note: str | None = None
     reported_by: str
     timestamp: datetime
+    updated_at: datetime | None = None
+    resolved_at: datetime | None = None
     status: str
 
     class Config:
         from_attributes = True
+
+
+class MaintenanceTicketStatusUpdate(BaseModel):
+    status: str = Field(..., pattern="^(OPEN|IN_REVIEW|RESOLVED)$")
+    resolution_note: str | None = None
+
+
+class ThresholdSettingResponse(BaseModel):
+    threshold: float
+    threshold_policy: str
+    threshold_source: str
+    artifact_threshold: float | None = None
+    override_active: bool
+    reason: str | None = None
+    updated_by: str | None = None
+    updated_at: datetime | None = None
+
+
+class ThresholdSettingUpdate(BaseModel):
+    threshold: float = Field(..., gt=0)
+    reason: str = Field(..., min_length=3, max_length=1000)
+
+
+class SystemStatusResponse(BaseModel):
+    checked_at: datetime
+    database: dict[str, Any]
+    ml_artifacts: dict[str, Any]
+    threshold: ThresholdSettingResponse
+    audit_chain: dict[str, Any]
+    telemetry_source: dict[str, Any]

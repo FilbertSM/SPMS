@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { fetchJson } from '../utils/api';
 
 const ForgotPasswordModal = ({ isOpen, onClose }) => {
@@ -24,19 +24,22 @@ const ForgotPasswordModal = ({ isOpen, onClose }) => {
   const isPasswordStrong = isLengthValid && isComplexityValid;
   const isMatching = newPassword === confirmPassword && confirmPassword !== '';
 
-  useEffect(() => {
-    if (isOpen) {
-      setStep(1);
-      setEmail('');
-      setOtp('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setError(null);
-      setSuccessMsg(null);
-      setShowPassword(false);
-      setShowConfirmPassword(false);
-    }
-  }, [isOpen]);
+  const resetForm = () => {
+    setStep(1);
+    setEmail('');
+    setOtp('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setError(null);
+    setSuccessMsg(null);
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
 
   const handleRequestOTP = async (e) => {
     e.preventDefault();
@@ -71,7 +74,7 @@ const ForgotPasswordModal = ({ isOpen, onClose }) => {
         }),
       });
       setSuccessMsg("Password updated successfully!");
-      setTimeout(() => onClose(), 2000);
+      setTimeout(() => handleClose(), 2000);
     } catch (err) {
       setError(err.message || "Invalid OTP or Code expired.");
     } finally {
@@ -86,7 +89,7 @@ const ForgotPasswordModal = ({ isOpen, onClose }) => {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden relative">
         
         {/* Close Button */}
-        <button onClick={onClose} className="absolute top-4 right-4 text-[#c5c6cd] hover:text-[#e74c3c] bg-transparent border-none cursor-pointer z-10">
+        <button onClick={handleClose} className="absolute top-4 right-4 text-[#c5c6cd] hover:text-[#e74c3c] bg-transparent border-none cursor-pointer z-10">
           <span className="material-symbols-outlined">close</span>
         </button>
 
