@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Form4Warning from '../components/Form4Warning';
 import { fetchJsonWithAuth } from '../utils/api';
 
@@ -8,7 +8,7 @@ const formatNumber = (value, decimals = 3) => {
 };
 
 const ArtifactStatus = ({ name, ready }) => (
-  <div className="flex items-center justify-between rounded-lg bg-[#f1f4f3] px-4 py-3 border border-[#c5c6cd]/20">
+  <div className="flex items-center justify-between gap-4 rounded-lg bg-[#f1f4f3] px-4 py-3 border border-[#c5c6cd]/20">
     <div className="flex items-center gap-3">
       <span className={`w-2 h-2 rounded-full ${ready ? 'bg-[#006d37]' : 'bg-[#ba1a1a]'}`}></span>
       <span className="text-sm font-bold text-[#1b263b] capitalize">{name.replaceAll('_', ' ')}</span>
@@ -21,134 +21,187 @@ const ArtifactStatus = ({ name, ready }) => (
 
 export default function Settings() {
   const [summary, setSummary] = useState(null);
+  const [thresholdState, setThresholdState] = useState(null);
+  const [thresholdDraft, setThresholdDraft] = useState('');
+  const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+
+  const loadSettings = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [summaryPayload, thresholdPayload] = await Promise.all([
+        fetchJsonWithAuth('/api/dashboard/summary'),
+        fetchJsonWithAuth('/api/settings/threshold'),
+      ]);
+      setSummary(summaryPayload);
+      setThresholdState(thresholdPayload);
+      setThresholdDraft(String(thresholdPayload.threshold ?? ''));
+      setReason(thresholdPayload.reason || '');
+      setError(null);
+    } catch (err) {
+      setError(err.status === 403 ? 'Admin access is required to edit runtime threshold settings.' : err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let ignore = false;
-
-    const loadSummary = async () => {
-      try {
-        setLoading(true);
-        const payload = await fetchJsonWithAuth('/api/dashboard/summary');
-        if (!ignore) {
-          setSummary(payload);
-          setError(null);
-        }
-      } catch (err) {
-        if (!ignore) {
-          setError(err.message);
-        }
-      } finally {
-        if (!ignore) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadSummary();
-    return () => {
-      ignore = true;
-    };
-  }, []);
+    const timer = window.setTimeout(loadSettings, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadSettings]);
 
   const artifacts = useMemo(
     () => Object.entries(summary?.artifact_status || {}).filter(([, value]) => typeof value === 'boolean'),
     [summary],
   );
-  const modelPath = summary?.artifact_status?.model_path;
+
+  const saveThreshold = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const payload = await fetchJsonWithAuth('/api/settings/threshold', {
+        method: 'PATCH',
+        body: JSON.stringify({ threshold: Number(thresholdDraft), reason }),
+      });
+      setThresholdState(payload);
+      setSummary((current) => current ? { ...current, threshold: payload.threshold, threshold_policy: payload.threshold_policy, threshold_source: payload.threshold_source } : current);
+      setSuccess('Runtime threshold override saved and audited.');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const resetThreshold = async () => {
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const payload = await fetchJsonWithAuth('/api/settings/threshold', { method: 'DELETE' });
+      setThresholdState(payload);
+      setThresholdDraft(String(payload.threshold ?? ''));
+      setReason('');
+      setSummary((current) => current ? { ...current, threshold: payload.threshold, threshold_policy: payload.threshold_policy, threshold_source: payload.threshold_source } : current);
+      setSuccess('Runtime override reset to artifact baseline.');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <div className="page-container">
-      <div className="mb-10 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
+    <div className="page-container space-y-6">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-4">
         <div>
-          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#45474d] block mb-2 font-label">
-            Monitoring Configuration
-          </span>
-          <h1 className="heading-primary">System Settings & Configuration</h1>
-          <p className="text-subtitle mt-2 max-w-3xl">
-            SPMS is predictive monitoring only. The frontend reports anomaly detection output and does not control, stop, or override the PMA Granulator machine.
+          <h1 className="heading-primary text-3xl">Settings</h1>
+          <p className="text-subtitle mt-2 max-w-2xl">
+            Runtime threshold configuration and read-only Form 4 administration status.
           </p>
         </div>
-        <button
-          disabled
-          title="Settings persistence is not implemented in this demo"
-          className="px-6 py-2.5 rounded-md text-sm font-bold text-white bg-[#1b263b]/60 cursor-not-allowed shadow font-label uppercase tracking-widest"
-        >
-          Save Global Config
-        </button>
       </div>
 
-      <Form4Warning>
-        Settings controls are read-only or disabled for Form 4. Editable admin configuration is not implemented in the backend yet.
-      </Form4Warning>
-
       {error && (
-        <div className="bg-[#ffdad6] border border-[#ba1a1a]/20 text-[#ba1a1a] rounded-lg px-4 py-3 text-sm font-bold">
-          Settings data unavailable: {error}
+        <div className="bg-[#ffdad6] border border-[#ba1a1a]/20 text-[#ba1a1a] rounded-lg px-4 py-3 text-sm font-bold mb-6">
+          Settings unavailable: {error}
+        </div>
+      )}
+      {success && (
+        <div className="bg-[#e8f5e9] border border-[#006d37]/20 text-[#006d37] rounded-lg px-4 py-3 text-sm font-bold mb-6">
+          {success}
         </div>
       )}
 
       <div className="grid grid-cols-12 gap-6">
         <section className="panel-card col-span-12 lg:col-span-8">
-          <div className="flex items-center gap-3 mb-8">
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
+            <div className="flex items-center gap-3">
             <span className="material-symbols-outlined text-[#1b263b] bg-[#f1f4f3] p-2 rounded-lg">
               psychology
             </span>
             <div>
-              <h3 className="heading-secondary">Model Threshold</h3>
+              <h3 className="heading-secondary">Runtime Threshold</h3>
               <p className="text-subtitle font-medium">
-                Read-only value loaded from the active LSTM Autoencoder metadata.
+                Effective anomaly threshold used by future predictions.
               </p>
             </div>
+            </div>
+            <span className={`inline-flex w-fit items-center rounded-md px-3 py-2 text-[10px] font-black uppercase tracking-widest ${thresholdState?.override_active ? 'bg-[#fff4ce] text-[#805600]' : 'bg-[#e8f5e9] text-[#00743a]'}`}>
+              {thresholdState?.override_active ? 'Override active' : 'Artifact baseline'}
+            </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="rounded-xl bg-[#f1f4f3] p-5 border border-[#c5c6cd]/20">
-              <p className="text-[10px] font-black uppercase tracking-widest text-[#45474d]">Threshold</p>
-              <p className="text-3xl font-black text-[#051125] mt-2">{loading ? '...' : formatNumber(summary?.threshold)}</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="rounded-lg bg-[#f1f4f3] p-4 border border-[#c5c6cd]/20">
+              <p className="text-[10px] font-black uppercase tracking-widest text-[#45474d]">Effective Threshold</p>
+              <p className="text-2xl font-black text-[#051125] mt-2">{loading ? '...' : formatNumber(thresholdState?.threshold ?? summary?.threshold)}</p>
             </div>
-            <div className="rounded-xl bg-[#f1f4f3] p-5 border border-[#c5c6cd]/20 md:col-span-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-[#45474d]">Threshold Policy</p>
+            <div className="rounded-lg bg-[#f1f4f3] p-4 border border-[#c5c6cd]/20">
+              <p className="text-[10px] font-black uppercase tracking-widest text-[#45474d]">Artifact Baseline</p>
+              <p className="text-2xl font-black text-[#051125] mt-2">{formatNumber(thresholdState?.artifact_threshold ?? summary?.artifact_threshold)}</p>
+            </div>
+            <div className="rounded-lg bg-[#f1f4f3] p-4 border border-[#c5c6cd]/20">
+              <p className="text-[10px] font-black uppercase tracking-widest text-[#45474d]">Source</p>
+              <p className="text-base font-black text-[#051125] mt-2">{thresholdState?.threshold_source || summary?.threshold_source || '-'}</p>
+            </div>
+            <div className="rounded-lg bg-[#f1f4f3] p-4 border border-[#c5c6cd]/20 md:col-span-3">
+              <p className="text-[10px] font-black uppercase tracking-widest text-[#45474d]">Policy</p>
               <p className="text-sm font-bold text-[#051125] mt-2">
-                {loading ? 'Loading...' : summary?.threshold_policy || 'No policy returned'}
+                {thresholdState?.threshold_policy || summary?.threshold_policy || 'No policy returned'}
               </p>
-            </div>
-            <div className="rounded-xl bg-[#f1f4f3] p-5 border border-[#c5c6cd]/20">
-              <p className="text-[10px] font-black uppercase tracking-widest text-[#45474d]">Valid Windows</p>
-              <p className="text-2xl font-black text-[#051125] mt-2">{summary?.valid_window_count ?? '-'}</p>
-            </div>
-            <div className="rounded-xl bg-[#f1f4f3] p-5 border border-[#c5c6cd]/20">
-              <p className="text-[10px] font-black uppercase tracking-widest text-[#45474d]">Skipped Windows</p>
-              <p className="text-2xl font-black text-[#051125] mt-2">{summary?.skipped_window_count ?? '-'}</p>
-            </div>
-            <div className="rounded-xl bg-[#f1f4f3] p-5 border border-[#c5c6cd]/20">
-              <p className="text-[10px] font-black uppercase tracking-widest text-[#45474d]">Current Status</p>
-              <p className="text-2xl font-black text-[#051125] mt-2">{summary?.status || '-'}</p>
             </div>
           </div>
 
-          <div className="mt-8 rounded-lg border border-[#c5c6cd]/30 bg-white p-4">
-            <Form4Warning className="mb-4">
-              Threshold editing is a future admin workflow and is intentionally disabled.
-            </Form4Warning>
-            <div className="flex items-start gap-3">
-              <span className="material-symbols-outlined text-[#45474d]">lock</span>
+          <form onSubmit={saveThreshold} className="rounded-lg border border-[#c5c6cd]/30 bg-[#f7faf9] p-5 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <p className="text-sm font-bold text-[#1b263b]">Future admin configuration</p>
-                <p className="text-xs text-[#45474d] mt-1">
-                  Threshold editing is intentionally disabled until the backend exposes audited settings updates.
-                </p>
+                <label className="form-label mb-2">Override Threshold</label>
+                <input
+                  type="number"
+                  step="0.000001"
+                  min="0.000001"
+                  value={thresholdDraft}
+                  onChange={(event) => setThresholdDraft(event.target.value)}
+                  className="input-field bg-white"
+                  required
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="form-label mb-2">Audit Reason</label>
+                <input
+                  value={reason}
+                  onChange={(event) => setReason(event.target.value)}
+                  minLength={3}
+                  className="input-field bg-white"
+                  placeholder="Reason for runtime override"
+                  required
+                />
               </div>
             </div>
-          </div>
+            <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
+              <button type="button" disabled={saving || !thresholdState?.override_active} onClick={resetThreshold} className="btn-secondary justify-center disabled:opacity-60 disabled:cursor-not-allowed">
+                <span className="material-symbols-outlined text-[18px]">restart_alt</span>
+                Reset to Artifact
+              </button>
+              <button type="submit" disabled={saving} className="btn-primary w-full sm:w-auto px-5 py-2.5 mt-0 disabled:opacity-60">
+                <span className="material-symbols-outlined text-[18px]">save</span>
+                Save Override
+              </button>
+            </div>
+          </form>
         </section>
 
         <section className="panel-card col-span-12 lg:col-span-4 flex flex-col gap-6">
           <div>
             <h3 className="heading-secondary mb-2">Artifact Readiness</h3>
             <p className="text-subtitle leading-relaxed">
-              Backend readiness for the model, scaler, threshold, and metadata artifacts used by latest-window inference.
+              Model, scaler, threshold, and metadata files required by latest-window inference.
             </p>
           </div>
           <div className="space-y-3">
@@ -159,18 +212,12 @@ export default function Settings() {
             {artifacts.map(([name, ready]) => (
               <ArtifactStatus key={name} name={name} ready={Boolean(ready)} />
             ))}
-            {modelPath && (
-              <div className="rounded-lg bg-[#f1f4f3] px-4 py-3 border border-[#c5c6cd]/20">
-                <p className="text-[10px] font-black uppercase tracking-widest text-[#45474d]">Model Path</p>
-                <p className="mt-1 break-all text-xs font-bold text-[#1b263b]">{modelPath}</p>
-              </div>
-            )}
           </div>
         </section>
 
         <section className="panel-card col-span-12 lg:col-span-5">
           <Form4Warning className="mb-6">
-            Notification rules below are future controls and do not persist to the backend.
+            Notification rules are display-only in this scope.
           </Form4Warning>
           <div className="flex items-center gap-3 mb-8">
             <span className="material-symbols-outlined text-[#1b263b] bg-[#f1f4f3] p-2 rounded-lg">
@@ -178,10 +225,10 @@ export default function Settings() {
             </span>
             <div>
               <h3 className="heading-secondary">Notification Rules</h3>
-              <p className="text-subtitle">Future admin config. Backend persistence is not implemented.</p>
+              <p className="text-subtitle">No alert routing service is connected.</p>
             </div>
           </div>
-          
+
           <div className="space-y-5">
             {['Critical anomaly alerts', 'Warning anomaly notifications', 'Sensor offline event', 'Weekly monitoring summary'].map((label) => (
               <div key={label} className="flex items-center justify-between py-2 border-b border-[#c5c6cd]/10 last:border-b-0">
@@ -204,54 +251,23 @@ export default function Settings() {
 
         <section className="panel-card col-span-12 lg:col-span-7">
           <Form4Warning className="mb-6">
-            User administration is not wired to a backend user-list or role-management workflow.
+            User administration is outside this implementation.
           </Form4Warning>
-          <div className="flex items-center justify-between mb-8 gap-4">
-            <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-[#1b263b] bg-[#f1f4f3] p-2 rounded-lg">
-                group
-              </span>
-              <div>
-                <h3 className="heading-secondary">User Access Management</h3>
-                <p className="text-subtitle">The current frontend can read the signed-in profile only.</p>
-              </div>
+          <div className="flex items-center gap-3 mb-6">
+            <span className="material-symbols-outlined text-[#1b263b] bg-[#f1f4f3] p-2 rounded-lg">
+              group
+            </span>
+            <div>
+              <h3 className="heading-secondary">User Access Management</h3>
+              <p className="text-subtitle">Admin-only threshold routes are backend-enforced.</p>
             </div>
-            <button
-              disabled
-              title="User administration is not implemented in this demo"
-              className="text-[11px] font-bold uppercase tracking-widest text-[#1b263b]/50 flex items-center gap-1 font-label cursor-not-allowed"
-            >
-              <span className="material-symbols-outlined text-sm">add</span> Add Personnel
-            </button>
           </div>
-
           <div className="rounded-lg bg-[#f1f4f3] border border-[#c5c6cd]/20 p-6">
-            <p className="text-sm font-bold text-[#1b263b]">No user list API is wired to this screen.</p>
+            <p className="text-sm font-bold text-[#1b263b]">Broad user management remains out of scope.</p>
             <p className="text-xs text-[#45474d] mt-2">
-              Role-based access is enforced by the backend. A managed personnel table should be added only after the backend exposes audited user administration endpoints.
+              This screen demonstrates role-gated threshold configuration, not user-list editing or key rotation.
             </p>
           </div>
-        </section>
-
-        <section className="panel-card col-span-12 flex flex-col md:flex-row gap-6 md:items-center md:justify-between border-l-4 border-l-[#1b263b]">
-          <Form4Warning className="md:max-w-md">
-            Security and retention controls are display-only until audited settings endpoints exist.
-          </Form4Warning>
-          <div className="flex items-center gap-4">
-            <span className="material-symbols-outlined text-[#1b263b]">security</span>
-            <div>
-              <h3 className="text-lg font-bold text-[#1b263b] font-headline">Security & Retention</h3>
-              <p className="text-xs text-[#45474d]">Future audited configuration. Current controls are display-only.</p>
-            </div>
-          </div>
-          
-          <button
-            disabled
-            title="Key rotation is not implemented in this demo"
-            className="px-5 py-2.5 bg-white text-[#1b263b]/50 text-[11px] font-bold uppercase tracking-widest border border-[#c5c6cd]/40 flex items-center gap-2 font-label rounded-md cursor-not-allowed"
-          >
-            <span className="material-symbols-outlined text-base">key</span> Rotate Cryptographic Keys
-          </button>
         </section>
       </div>
     </div>

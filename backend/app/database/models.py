@@ -17,10 +17,6 @@ class User(Base):
     reset_otp_expire = Column(DateTime(timezone=True), nullable=True)
 
 class AuditLog(Base):
-    """
-    🛡️ Tabel Audit Log (Cyber Security Layer)
-    Digunakan untuk mencatat jejak aktivitas user dan deteksi serangan.
-    """
     __tablename__ = "audit_logs"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -30,6 +26,10 @@ class AuditLog(Base):
     status = Column(String(50), nullable=True) 
     ip_address = Column(String(45), nullable=True)
     browser_info = Column(String(500), nullable=True)
+    record_hash = Column(String(64), nullable=True, index=True)
+    previous_hash = Column(String(64), nullable=True)
+    hash_algorithm = Column(String(20), nullable=False, default="SHA-256")
+    hash_payload_version = Column(String(20), nullable=False, default="audit-v1")
 
 
 class TelemetryReading(Base):
@@ -61,17 +61,34 @@ class AnomalyEvent(Base):
     is_anomaly = Column(Boolean, default=False, index=True)
     severity = Column(String(30), default="normal")
     threshold_policy = Column(String(255), nullable=True)
+    threshold_source = Column(String(50), default="artifact_baseline")
     model_version = Column(String(255), nullable=True)
     details = Column(Text, nullable=True)
+    acknowledged_at = Column(DateTime(timezone=True), nullable=True)
+    acknowledged_by = Column(String(255), nullable=True)
+    acknowledgement_note = Column(Text, nullable=True)
     
 class MaintenanceTicket(Base):
     __tablename__ = "maintenance_tickets"
 
-    # Pastikan baris di bawah ini ada tulisan primary_key=True
-    id = Column(Integer, primary_key=True, index=True) 
-    
-    machine_id = Column(String(50), index=True)
+    id = Column(Integer, primary_key=True, index=True)
+    anomaly_event_id = Column(Integer, nullable=True, index=True)
+    machine_id = Column(String(100), index=True)
     issue_description = Column(Text, nullable=False)
+    resolution_note = Column(Text, nullable=True)
     reported_by = Column(String(100), nullable=False)
-    status = Column(String(20), default="Open")
+    status = Column(String(20), default="OPEN", index=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class RuntimeSetting(Base):
+    __tablename__ = "runtime_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String(100), unique=True, index=True, nullable=False)
+    value_json = Column(Text, nullable=False)
+    reason = Column(Text, nullable=True)
+    updated_by = Column(String(255), nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import ForgotPasswordModal from './ForgotPasswordModal';
-import { postForm } from '../utils/api';
 
 const Login = () => {
   const navigate = useNavigate();
