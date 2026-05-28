@@ -12,43 +12,43 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(() => Boolean(localStorage.getItem('spms_remembered_email'))); // New: Remember Me
   const [showPassword, setShowPassword] = useState(false); // New: Show/Hide Password
-  const [error, setError] = useState(null);
+  const [emailError, setEmailError] = useState(null); 
+  const [loginError, setLoginError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [successMsg, setSuccessMsg] = useState(null);
 
   // --- VALIDATION LOGIC (UPDATED: PASSED COMPLEXITY REMOVED) ---
   const validateForm = () => {
+    setEmailError(null);
+    setLoginError(null);
     // 1. Strict Email Validation (Regex) - Tetap dipertahankan agar format email benar
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(email)) {
-      setError("Please enter a valid company email address (e.g., name@domain.com).");
+      setEmailError("Please enter a valid company email address.");
       return false;
     }
-
     return true;
   };
 
   // --- HANDLERS ---
-  const handleLogin = async (e) => {
+ const handleLogin = async (e) => {
     e.preventDefault();
-    setError(null);
+    setLoginError(null);
+
     if (!validateForm()) return;
     setIsLoading(true);
 
     try {
-      // 1. Buat data dalam format yang dimau FastAPI (username & password)
       const details = {
         'username': email,
         'password': password
       };
 
-      // 2. Ubah object di atas menjadi string "username=...&password=..."
       const formBody = Object.keys(details)
         .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(details[key]))
         .join('&');
 
-      // 3. Kirim dengan header yang sangat spesifik
       const response = await fetch('http://127.0.0.1:8000/api/login', {
         method: 'POST',
         headers: {
@@ -65,47 +65,25 @@ const Login = () => {
       const data = await response.json();
       localStorage.setItem('spms_token', data.access_token);
       
+      // Logika Remember Me
+      if (rememberMe) {
+        localStorage.setItem('spms_remembered_email', email);
+      } else {
+        localStorage.removeItem('spms_remembered_email');
+      }
+      
       setSuccessMsg("Login successful!");
       setTimeout(() => { navigate('/app'); }, 1000);
       
     } catch (err) {
-      setError("Login failed: Invalid email or password.");
+      // Set error login disini
+      setLoginError("Login failed: Incorrect email or password.");
       setIsLoading(false);
     }
   };
-
-  const handleCloseError = useCallback(() => {
-    setIsClosing(true);
-    setTimeout(() => {
-      setError(null);
-      setIsClosing(false);
-    }, 400);
-  }, []);
-
-  useEffect(() => {
-    if (error) {
-      const timer = setTimeout(() => {
-        handleCloseError();
-      }, 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [error, handleCloseError]);
-
   return (
     <div className="auth-container">
       {/* --- TOAST NOTIFICATION --- */}
-      {error && (
-        <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 bg-white border-l-4 border-[#e74c3c] px-6 py-4 shadow-2xl rounded-lg ${isClosing ? 'animate-toast-out' : 'animate-toast-in'}`}>
-          <span className="material-symbols-outlined text-[#e74c3c]">error</span>
-          <p className="text-sm font-bold text-[#1b263b]">{error}</p>
-          <button 
-            onClick={handleCloseError}
-            className="ml-4 text-[#c5c6cd] hover:text-[#45474d] transition-colors bg-transparent border-none cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-sm">close</span>
-          </button>
-        </div>
-      )}
       {successMsg && (
         <div className="fixed top-6 right-6 z-50 flex items-center gap-3 bg-white border-l-4 border-[#2ecc71] px-6 py-4 shadow-2xl rounded-lg animate-toast-in">
           <span className="material-symbols-outlined text-[#2ecc71]">check_circle</span>
@@ -151,16 +129,31 @@ const Login = () => {
                 Company Email
               </label>
               <div className="relative">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#45474d]">mail</span>
+                <span className={`material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 ${emailError ? 'text-[#e74c3c]' : 'text-[#45474d]'}`}>mail</span>
                 <input 
                   type="email" 
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="input-icon-field"
-                  placeholder="e.g. budi.p@sakafarma.com"
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (emailError) setEmailError(null);
+                    if (loginError) setLoginError(null);
+                  }}
+                  className={`w-full pl-10 pr-4 py-3 bg-[#f1f4f3] border rounded-lg focus:bg-white outline-none transition-all text-[#1b263b] font-medium ${
+                    emailError 
+                      ? 'border-[#e74c3c] focus:border-[#e74c3c] focus:ring-2 focus:ring-[#e74c3c]/20' 
+                      : 'border-transparent focus:border-[#1b263b] focus:ring-2 focus:ring-[#1b263b]/10'
+                  }`}
+                  placeholder="e.g. budi.p@kalbeconsumerhealth.co.id"
                   required
                 />
               </div>
+              {/* INLINE ERROR UNTUK EMAIL */}
+              {emailError && (
+                <p className="mt-1.5 text-[11px] font-semibold text-[#e74c3c] flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[14px]">error</span>
+                  {emailError}
+                </p>
+              )}
             </div>
 
             {/* PASSWORD INPUT */}
@@ -178,16 +171,22 @@ const Login = () => {
                 </button>
               </div>
               <div className="relative">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#45474d]">lock</span>
+                <span className={`material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 ${loginError ? 'text-[#e74c3c]' : 'text-[#45474d]'}`}>lock</span>
                 <input 
                   type={showPassword ? "text" : "password"} 
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-10 py-3 bg-[#f1f4f3] border border-transparent rounded-lg focus:bg-white focus:border-[#1b263b] focus:ring-2 focus:ring-[#1b263b]/10 outline-none transition-all text-[#1b263b] font-medium"
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (loginError) setLoginError(null);
+                  }}
+                  className={`w-full pl-10 pr-10 py-3 bg-[#f1f4f3] border rounded-lg focus:bg-white outline-none transition-all text-[#1b263b] font-medium ${
+                    loginError 
+                      ? 'border-[#e74c3c] focus:border-[#e74c3c] focus:ring-2 focus:ring-[#e74c3c]/20' 
+                      : 'border-transparent focus:border-[#1b263b] focus:ring-2 focus:ring-[#1b263b]/10'
+                  }`}
                   placeholder="••••••••"
                   required
                 />
-                {/* SHOW/HIDE PASSWORD ICON BUTTON */}
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
@@ -214,8 +213,16 @@ const Login = () => {
               </label>
             </div>
 
+            {/* INLINE ERROR UNTUK INCORRECT CREDENTIALS (MUNcul SEBELUM TOMBOL) */}
+            {loginError && (
+              <div className="flex items-center gap-2 bg-[#e74c3c]/10 text-[#e74c3c] px-4 py-3 rounded-lg border border-[#e74c3c]/20 animate-fade-in">
+                <span className="material-symbols-outlined text-lg">error</span>
+                <p className="text-sm font-bold">{loginError}</p>
+              </div>
+            )}
+
             {/* SUBMIT BUTTON */}
-            <button type="submit" disabled={isLoading} className="btn-primary">
+            <button type="submit" disabled={isLoading} className="btn-primary mt-2">
               {isLoading ? (
                 <>
                   <span className="material-symbols-outlined animate-spin text-sm">sync</span>

@@ -199,7 +199,7 @@ def register_user(request: Request, user: schemas.UserCreate, db: Session = Depe
         )
 
     # 2. Gagal karena Domain Tidak Diizinkan
-    allowed_domains = ["sakafarma.com", "gmail.com", "president.ac.id", "student.president.ac.id"]
+    allowed_domains = ["kalbeconsumerhealth.co.id", "gmail.com", "president.ac.id", "student.president.ac.id"]
     email_domain = normalized_email.split("@")[-1] if "@" in normalized_email else ""
     if email_domain not in allowed_domains:
         failed_log = models.AuditLog(

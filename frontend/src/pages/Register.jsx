@@ -11,12 +11,13 @@ const Register = () => {
   const [showPassword, setShowPassword] = useState(false); 
   const [showConfirmPassword, setShowConfirmPassword] = useState(false); 
   const [error, setError] = useState(null);
+  const [emailError, setEmailError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isClosing, setIsClosing] = useState(false); 
   const [successMsg, setSuccessMsg] = useState(null); 
 
   // --- LIST DOMAIN RESMI YANG DIIZINKAN ---
-  const ALLOWED_DOMAINS = ['sakafarma.com', 'gmail.com', 'president.ac.id', 'student.president.ac.id'];
+  const ALLOWED_DOMAINS = ['kalbeconsumerhealth.co.id', 'gmail.com', 'president.ac.id', 'student.president.ac.id'];
 
   // --- LIVE VALIDATION STATES ---
   const isLengthValid = password.length >= 8 && password.length <= 20;
@@ -48,13 +49,13 @@ const Register = () => {
     // 1. Strict Email & Domain Validation
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(email)) {
-      setError("Please enter a valid email address structure.");
+      setEmailError("Please enter a valid email address structure.");
       return false;
     }
 
     const emailDomain = email.trim().split('@')[1]?.toLowerCase();
     if (!ALLOWED_DOMAINS.includes(emailDomain)) {
-      setError("Registration is restricted to sakafarma.com, gmail.com, president.ac.id, or student.president.ac.id emails.");
+      setEmailError("Registration is restricted to kalbeconsumerhealth.co.id, gmail.com, president.ac.id, or student.president.ac.id emails.");
       return false;
     }
 
@@ -173,11 +174,25 @@ const Register = () => {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 bg-[#f1f4f3] border border-transparent rounded-lg focus:bg-white focus:border-[#1b263b] focus:ring-2 focus:ring-[#1b263b]/10 outline-none transition-all text-[#1b263b] font-medium text-sm"
-                placeholder="e.g. budi.p@sakafarma.com"
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (emailError) setEmailError(null); // Otomatis hilangkan error saat user mengetik ulang
+                }}
+                className={`w-full px-4 py-3 bg-[#f1f4f3] border rounded-lg focus:bg-white outline-none transition-all text-[#1b263b] font-medium text-sm ${
+                  emailError 
+                    ? 'border-[#e74c3c] focus:border-[#e74c3c] focus:ring-2 focus:ring-[#e74c3c]/20' 
+                    : 'border-transparent focus:border-[#1b263b] focus:ring-2 focus:ring-[#1b263b]/10'
+                }`}
+                placeholder="e.g. budi.p@kalbeconsumerhealth.co.id"
                 required
               />
+              {/* TAMPILAN INLINE ERROR */}
+              {emailError && (
+                <p className="mt-1.5 text-[11px] font-semibold text-[#e74c3c] flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[14px]">error</span>
+                  {emailError}
+                </p>
+              )}
             </div>
 
             {/* PASSWORD */}

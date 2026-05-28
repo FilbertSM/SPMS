@@ -123,7 +123,7 @@ const ForgotPasswordModal = ({ isOpen, onClose }) => {
                 <label className="block text-[11px] font-bold text-[#45474d] uppercase tracking-widest mb-2 font-label">Company Email</label>
                 <div className="relative">
                   <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#45474d]">mail</span>
-                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-[#f1f4f3] border border-transparent rounded-lg focus:bg-white focus:border-[#1b263b] outline-none transition-all text-sm font-medium" placeholder="e.g. budi.p@sakafarma.com" required />
+                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-[#f1f4f3] border border-transparent rounded-lg focus:bg-white focus:border-[#1b263b] outline-none transition-all text-sm font-medium" placeholder="e.g. budi.p@kalbeconsumerhealth.co.id" required />
                 </div>
               </div>
               <button type="submit" disabled={isLoading || !email} className="w-full py-3 bg-[#1b263b] hover:bg-[#2c3e50] text-white text-sm font-bold rounded-lg transition-all disabled:bg-[#c5c6cd] flex items-center justify-center gap-2">
