@@ -110,6 +110,20 @@ Dashboard data flow:
 * `GET /api/telemetry/latest` prefers mapped `pma_l1` rows and falls back to `telemetry_readings`.
 * `GET /api/dashboard/summary` returns latest telemetry, latest saved anomaly event, threshold metadata, artifact readiness, valid-window count, skipped-window count, and recent alerts.
 
+Forecast-risk endpoints are authenticated and separate from Autoencoder inference:
+
+```text
+POST /api/forecast/latest
+GET  /api/forecast/latest
+```
+
+They use `daily_health_metrics` and cached `forecast_runs`, apply the current
+effective threshold, and never create tickets or machine actions. Missing or
+deployment-gate-rejected artifacts return `503`; insufficient history returns
+`409`. The current forecast experiment is gate-rejected, so model unavailable is
+the expected response until a future Day+1 and Day+7 model passes both baselines
+and MASE below `1.0`.
+
 If `pma_l1` is missing or stale in Docker, reset the local-only database volume and rebuild so the `db_init` SQL imports run again:
 
 ```bash

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text
+from sqlalchemy import Column, Integer, String, Boolean, Date, DateTime, Float, Text, UniqueConstraint
 from sqlalchemy.sql import func
 from app.database.database import Base
 
@@ -92,3 +92,36 @@ class RuntimeSetting(Base):
     reason = Column(Text, nullable=True)
     updated_by = Column(String(255), nullable=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class DailyHealthMetric(Base):
+    __tablename__ = "daily_health_metrics"
+    __table_args__ = (UniqueConstraint("machine_id", "metric_date", name="uq_daily_health_machine_date"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    machine_id = Column(String(100), default="PMA Granulator #01", nullable=False, index=True)
+    metric_date = Column(Date, nullable=False, index=True)
+    p95_reconstruction_error = Column(Float, nullable=False)
+    mean_reconstruction_error = Column(Float, nullable=False)
+    max_reconstruction_error = Column(Float, nullable=False)
+    observation_count = Column(Integer, nullable=False, default=0)
+    observation_flag = Column(Boolean, nullable=False, default=True)
+    source = Column(String(100), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class ForecastRun(Base):
+    __tablename__ = "forecast_runs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    machine_id = Column(String(100), default="PMA Granulator #01", nullable=False, index=True)
+    generated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+    history_start = Column(Date, nullable=False)
+    history_end = Column(Date, nullable=False)
+    threshold = Column(Float, nullable=False)
+    threshold_source = Column(String(50), nullable=False)
+    model_version = Column(String(255), nullable=False)
+    deployment_gate_passed = Column(Boolean, nullable=False)
+    history_signature = Column(String(64), nullable=False)
+    cache_key = Column(String(64), nullable=False, unique=True, index=True)
+    payload_json = Column(Text, nullable=False)

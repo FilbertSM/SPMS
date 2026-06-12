@@ -1,0 +1,27 @@
+{
+  "passed": false,
+  "released_horizons": [
+    1,
+    7
+  ],
+  "primary_rule": "Test MASE < 1.0 and MAE beats persistence and weekly-naive for Day+1 and Day+7.",
+  "horizons": {
+    "1": {
+      "passed": false,
+      "checks": {
+        "mase_below_one": false,
+        "beats_persistence_mae": false,
+        "beats_weekly_naive_mae": false
+      }
+    },
+    "7": {
+      "passed": false,
+      "checks": {
+        "mase_below_one": false,
+        "beats_persistence_mae": false,
+        "beats_weekly_naive_mae": false
+      }
+    }
+  },
+  "runtime_behavior": "model_unavailable"
+}

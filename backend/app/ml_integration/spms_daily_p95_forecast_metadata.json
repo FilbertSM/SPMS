@@ -1,0 +1,255 @@
+{
+  "model_version": "spms-daily-p95-forecast-v1",
+  "target_metric": "daily_p95_reconstruction_mae",
+  "conditional_on_operation": true,
+  "source_window_metadata": "Data/data/spms_valid_windows_metadata.csv",
+  "upstream_autoencoder_metadata": "Data/export_models/spms_lstm_rebuild_metadata.json",
+  "lookback_days": 28,
+  "released_horizons": [
+    1,
+    7
+  ],
+  "research_horizons": [
+    14
+  ],
+  "deferred_horizons": [
+    30
+  ],
+  "features": [
+    "p95_reconstruction_error",
+    "mean_reconstruction_error",
+    "max_reconstruction_error",
+    "window_count",
+    "observation_flag",
+    "days_since_operation",
+    "weekday_sin",
+    "weekday_cos",
+    "horizon_fraction"
+  ],
+  "train_only_scaling": true,
+  "chronological_rolling_origin": true,
+  "daily_calendar_start": "2025-05-30",
+  "daily_calendar_end": "2026-03-13",
+  "calendar_day_count": 288,
+  "observed_operating_day_count": 170,
+  "missing_calendar_day_count": 118,
+  "sequence_sample_counts": {
+    "train": {
+      "1": 88,
+      "7": 84,
+      "14": 78
+    },
+    "validation": {
+      "1": 46,
+      "7": 46,
+      "14": 46
+    },
+    "test": {
+      "1": 16,
+      "7": 16,
+      "14": 16
+    }
+  },
+  "threshold": 0.2241775095462799,
+  "threshold_policy": "99th percentile of validation reconstruction MAE",
+  "training_epochs": 37,
+  "seed": 42,
+  "evaluation": {
+    "1": {
+      "validation": {
+        "model": {
+          "sample_count": 46,
+          "mae": 0.026122067123651505,
+          "rmse": 0.037720516324043274,
+          "mase": 1.1564528761220727,
+          "interval_90_coverage": 0.8913043478260869,
+          "actual_threshold_crossings": 1,
+          "predicted_threshold_crossings": 0,
+          "interval_crosses_threshold": 0
+        },
+        "persistence": {
+          "sample_count": 46,
+          "mae": 0.03569420799612999,
+          "rmse": 0.04726748913526535,
+          "mase": 1.5802221662867322
+        },
+        "weekly_naive": {
+          "sample_count": 46,
+          "mae": 0.03818554803729057,
+          "rmse": 0.04980970174074173,
+          "mase": 1.6905165523458512
+        },
+        "first_target_date": "2025-11-07",
+        "last_target_date": "2026-02-19"
+      },
+      "test": {
+        "model": {
+          "sample_count": 16,
+          "mae": 0.13320684432983398,
+          "rmse": 0.14595088362693787,
+          "mase": 5.897214700321466,
+          "interval_90_coverage": 0.1875,
+          "actual_threshold_crossings": 8,
+          "predicted_threshold_crossings": 0,
+          "interval_crosses_threshold": 0
+        },
+        "persistence": {
+          "sample_count": 16,
+          "mae": 0.0569106787443161,
+          "rmse": 0.08413206785917282,
+          "mase": 2.519498851464696
+        },
+        "weekly_naive": {
+          "sample_count": 16,
+          "mae": 0.056263238191604614,
+          "rmse": 0.07668162882328033,
+          "mase": 2.4908359403039118
+        },
+        "first_target_date": "2026-02-20",
+        "last_target_date": "2026-03-13"
+      }
+    },
+    "7": {
+      "validation": {
+        "model": {
+          "sample_count": 46,
+          "mae": 0.026314061135053635,
+          "rmse": 0.03931310400366783,
+          "mase": 1.1649526638928183,
+          "interval_90_coverage": 0.8913043478260869,
+          "actual_threshold_crossings": 1,
+          "predicted_threshold_crossings": 0,
+          "interval_crosses_threshold": 0
+        },
+        "persistence": {
+          "sample_count": 46,
+          "mae": 0.034740105271339417,
+          "rmse": 0.043634410947561264,
+          "mase": 1.5379829807361773
+        },
+        "weekly_naive": {
+          "sample_count": 46,
+          "mae": 0.034740105271339417,
+          "rmse": 0.043634410947561264,
+          "mase": 1.5379829807361773
+        },
+        "first_target_date": "2025-11-07",
+        "last_target_date": "2026-02-19"
+      },
+      "test": {
+        "model": {
+          "sample_count": 16,
+          "mae": 0.13168871402740479,
+          "rmse": 0.14422670006752014,
+          "mase": 5.830005388506218,
+          "interval_90_coverage": 0.1875,
+          "actual_threshold_crossings": 8,
+          "predicted_threshold_crossings": 0,
+          "interval_crosses_threshold": 0
+        },
+        "persistence": {
+          "sample_count": 16,
+          "mae": 0.05086727440357208,
+          "rmse": 0.06778700649738312,
+          "mase": 2.251950640278372
+        },
+        "weekly_naive": {
+          "sample_count": 16,
+          "mae": 0.05086727440357208,
+          "rmse": 0.06778700649738312,
+          "mase": 2.251950640278372
+        },
+        "first_target_date": "2026-02-20",
+        "last_target_date": "2026-03-13"
+      }
+    },
+    "14": {
+      "validation": {
+        "model": {
+          "sample_count": 46,
+          "mae": 0.02948974072933197,
+          "rmse": 0.04102424532175064,
+          "mase": 1.3055435207748975,
+          "interval_90_coverage": 0.8913043478260869,
+          "actual_threshold_crossings": 1,
+          "predicted_threshold_crossings": 0,
+          "interval_crosses_threshold": 0
+        },
+        "persistence": {
+          "sample_count": 46,
+          "mae": 0.036852508783340454,
+          "rmse": 0.04763355851173401,
+          "mase": 1.6315014264786323
+        },
+        "weekly_naive": {
+          "sample_count": 46,
+          "mae": 0.03874387964606285,
+          "rmse": 0.04931901767849922,
+          "mase": 1.715234511753051
+        },
+        "first_target_date": "2025-11-07",
+        "last_target_date": "2026-02-19"
+      },
+      "test": {
+        "model": {
+          "sample_count": 16,
+          "mae": 0.12604866921901703,
+          "rmse": 0.1372474581003189,
+          "mase": 5.580314351068687,
+          "interval_90_coverage": 0.1875,
+          "actual_threshold_crossings": 8,
+          "predicted_threshold_crossings": 0,
+          "interval_crosses_threshold": 0
+        },
+        "persistence": {
+          "sample_count": 16,
+          "mae": 0.09006734937429428,
+          "rmse": 0.10572361946105957,
+          "mase": 3.9873814248906285
+        },
+        "weekly_naive": {
+          "sample_count": 16,
+          "mae": 0.06189829856157303,
+          "rmse": 0.0866449698805809,
+          "mase": 2.7403063111257957
+        },
+        "first_target_date": "2026-02-20",
+        "last_target_date": "2026-03-13"
+      }
+    }
+  },
+  "deployment_gate": {
+    "passed": false,
+    "released_horizons": [
+      1,
+      7
+    ],
+    "primary_rule": "Test MASE < 1.0 and MAE beats persistence and weekly-naive for Day+1 and Day+7.",
+    "horizons": {
+      "1": {
+        "passed": false,
+        "checks": {
+          "mase_below_one": false,
+          "beats_persistence_mae": false,
+          "beats_weekly_naive_mae": false
+        }
+      },
+      "7": {
+        "passed": false,
+        "checks": {
+          "mase_below_one": false,
+          "beats_persistence_mae": false,
+          "beats_weekly_naive_mae": false
+        }
+      }
+    },
+    "runtime_behavior": "model_unavailable"
+  },
+  "limitations": [
+    "Forecasts estimate daily P95 reconstruction MAE only if the machine operates on the target date.",
+    "The target is an unsupervised anomaly score, not a confirmed future machine condition or failure probability.",
+    "No confirmed failure labels, RUL validation, maintenance recommendation, scheduler, or machine-control action is produced.",
+    "Day+14 is research-only. Day+30 is deferred because chronological test support is insufficient.",
+    "Runtime release is blocked unless Day+1 and Day+7 pass the baseline and MASE deployment gate."
+  ]
+}

@@ -28,6 +28,11 @@ from app.core.config import settings
 from app.core.security import ALGORITHM
 from app.database import models
 from app.database.database import SessionLocal, engine
+from app.ml_integration.forecast_service import (
+    ForecastUnavailable,
+    InsufficientForecastHistory,
+    forecast_service,
+)
 from app.ml_integration.inference_service import inference_service
 from app.ml_integration.window_builder import (
     WindowSourceUnavailable,
@@ -1103,6 +1108,7 @@ def _save_anomaly_event(
     db.add(event)
     db.commit()
     db.refresh(event)
+    forecast_service.update_daily_metric_from_event(db, models, event=event, source=source)
     return event, severity
 
 
@@ -1485,6 +1491,7 @@ def read_system_status(
         "checked_at": datetime.now(timezone.utc),
         "database": database_status,
         "ml_artifacts": inference_service.readiness_status(),
+        "forecast_artifacts": forecast_service.readiness_status(),
         "threshold": _threshold_state(db),
         "audit_chain": _verify_audit_hash_chain(db),
         "telemetry_source": telemetry_status,
@@ -1498,6 +1505,71 @@ def read_system_status(
         status_value="SUCCESS",
     )
 
+    return payload
+
+
+@app.post("/api/forecast/latest", response_model=schemas.ForecastResponse)
+def generate_latest_forecast(
+    request: Request,
+    machine_id: str = "PMA Granulator #01",
+    refresh: bool = False,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        payload = forecast_service.generate(
+            db,
+            models,
+            machine_id=machine_id,
+            threshold_state=_threshold_state(db),
+            force=refresh,
+        )
+    except ForecastUnavailable as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    except InsufficientForecastHistory as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except (ImportError, OSError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Forecast runtime could not generate a result: {exc}",
+        ) from exc
+
+    _record_audit_log(
+        db,
+        request=request,
+        user_email=current_user.email,
+        action="FORECAST_GENERATE",
+        status_value="SUCCESS",
+    )
+    return payload
+
+
+@app.get("/api/forecast/latest", response_model=schemas.ForecastResponse)
+def read_latest_forecast(
+    request: Request,
+    machine_id: str = "PMA Granulator #01",
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        payload = forecast_service.latest(
+            db,
+            models,
+            machine_id=machine_id,
+            threshold_state=_threshold_state(db),
+        )
+    except ForecastUnavailable as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    except InsufficientForecastHistory as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    _record_audit_log(
+        db,
+        request=request,
+        user_email=current_user.email,
+        action="FORECAST_VIEW",
+        status_value="SUCCESS",
+    )
     return payload
 
 

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field, EmailStr
@@ -168,6 +168,42 @@ class SystemStatusResponse(BaseModel):
     checked_at: datetime
     database: dict[str, Any]
     ml_artifacts: dict[str, Any]
+    forecast_artifacts: dict[str, Any]
     threshold: ThresholdSettingResponse
     audit_chain: dict[str, Any]
     telemetry_source: dict[str, Any]
+
+
+class DailyHealthMetricResponse(BaseModel):
+    date: date
+    p95_reconstruction_error: float
+    mean_reconstruction_error: float
+    max_reconstruction_error: float
+    observation_count: int
+    source: str
+
+
+class ForecastPointResponse(BaseModel):
+    horizon_days: int
+    target_date: date
+    predicted_reconstruction_error: float
+    lower_bound: float
+    upper_bound: float
+    forecast_risk_status: str
+    interval_crosses_threshold: bool
+
+
+class ForecastResponse(BaseModel):
+    generated_at: datetime
+    history_start: date
+    history_end: date
+    target_metric: str
+    conditional_on_operation: bool
+    threshold: float
+    threshold_source: str
+    model_version: str
+    deployment_gate: dict[str, Any]
+    observed_history: list[DailyHealthMetricResponse]
+    forecasts: list[ForecastPointResponse]
+    limitations: list[str]
+    cache_status: str

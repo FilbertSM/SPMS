@@ -1,5 +1,17 @@
 import { Link } from 'react-router-dom';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  CartesianGrid,
+  ComposedChart,
+  ErrorBar,
+  Line,
+  ReferenceLine,
+  ResponsiveContainer,
+  Scatter,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import Form4Warning from '../components/Form4Warning';
 import { fetchJsonWithAuth } from '../utils/api';
 
@@ -21,6 +33,14 @@ const formatTime = (timestamp) => {
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) return 'Invalid timestamp';
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+const formatDate = (value) => {
+  if (!value) return '-';
+  const parsed = new Date(`${String(value).slice(0, 10)}T00:00:00`);
+  return Number.isNaN(parsed.getTime())
+    ? String(value)
+    : parsed.toLocaleDateString([], { month: 'short', day: 'numeric' });
 };
 
 const createPolylinePoints = (values, width, height, padding = 10) => {
@@ -93,6 +113,23 @@ const Dashboard = () => {
     lastRunAt: null,
   });
   const [lastRefreshedAt, setLastRefreshedAt] = useState(null);
+  const [forecastState, setForecastState] = useState({
+    loading: true,
+    refreshing: false,
+    data: null,
+    error: null,
+    status: null,
+  });
+
+  const loadForecast = useCallback(async () => {
+    setForecastState((previous) => ({ ...previous, loading: true }));
+    try {
+      const data = await fetchJsonWithAuth('/api/forecast/latest');
+      setForecastState({ loading: false, refreshing: false, data, error: null, status: null });
+    } catch (err) {
+      setForecastState({ loading: false, refreshing: false, data: null, error: err.message, status: err.status || null });
+    }
+  }, []);
 
   const loadDashboard = useCallback(async ({ showLoading = true } = {}) => {
     try {
@@ -119,10 +156,27 @@ const Dashboard = () => {
 
   useEffect(() => {
     loadDashboard();
+    loadForecast();
     const timer = window.setInterval(() => loadDashboard({ showLoading: false }), 60000);
 
     return () => window.clearInterval(timer);
-  }, [loadDashboard]);
+  }, [loadDashboard, loadForecast]);
+
+  const handleRefreshForecast = async () => {
+    setForecastState((previous) => ({ ...previous, refreshing: true, error: null, status: null }));
+    try {
+      const data = await fetchJsonWithAuth('/api/forecast/latest?refresh=true', { method: 'POST' });
+      setForecastState({ loading: false, refreshing: false, data, error: null, status: null });
+    } catch (err) {
+      setForecastState((previous) => ({
+        ...previous,
+        loading: false,
+        refreshing: false,
+        error: err.message,
+        status: err.status || null,
+      }));
+    }
+  };
 
   const handleRunLatestInference = async () => {
     setInferenceState((previous) => ({ ...previous, loading: true, error: null, status: null }));
@@ -201,6 +255,35 @@ const Dashboard = () => {
   const gaugeRatio = anomalyScore !== null && threshold ? Math.min(anomalyScore / Math.max(threshold * 1.25, anomalyScore), 1) : 0.08;
   const gaugeOffset = 251.2 - 251.2 * gaugeRatio;
   const latestVibration = vibrationValues[vibrationValues.length - 1];
+  const forecastData = forecastState.data;
+  const forecastThreshold = toNumber(forecastData?.threshold) ?? threshold;
+  const observedForecastHistory = useMemo(
+    () => (forecastData?.observed_history || []).map((item) => ({
+      date: String(item.date).slice(0, 10),
+      observed: toNumber(item.p95_reconstruction_error),
+      kind: 'Observed',
+    })),
+    [forecastData],
+  );
+  const forecastPoints = useMemo(
+    () => (forecastData?.forecasts || []).map((item) => {
+      const predicted = toNumber(item.predicted_reconstruction_error);
+      const lower = toNumber(item.lower_bound);
+      const upper = toNumber(item.upper_bound);
+      return {
+        date: String(item.target_date).slice(0, 10),
+        forecast: predicted,
+        interval: predicted === null || lower === null || upper === null ? [0, 0] : [predicted - lower, upper - predicted],
+        horizon: `Day+${item.horizon_days}`,
+        status: item.forecast_risk_status,
+      };
+    }),
+    [forecastData],
+  );
+  const forecastChartData = useMemo(
+    () => [...observedForecastHistory, ...forecastPoints].sort((left, right) => left.date.localeCompare(right.date)),
+    [observedForecastHistory, forecastPoints],
+  );
 
   const sensorCards = [
     ['thermostat', 'Temp S-01', latestReading?.temperature_c],
@@ -410,6 +493,119 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
+      </section>
+
+      <section className="bg-white rounded-xl p-6 shadow-sm border border-[#c5c6cd]/10">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[#1b263b]">query_stats</span>
+              <h4 className="font-headline font-bold text-[#051125]">Forecast Risk</h4>
+              {forecastData?.cache_status === 'stale' && (
+                <span className="rounded-full bg-[#ffe08a] px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-[#805600]">
+                  Stale cache
+                </span>
+              )}
+            </div>
+            <p className="mt-1 max-w-3xl text-xs leading-relaxed text-[#45474d]">
+              Daily P95 reconstruction MAE forecast, conditional on the machine operating on the target date. This is a forecast risk condition, not a confirmed future machine condition, failure date, or maintenance instruction.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleRefreshForecast}
+            disabled={forecastState.refreshing || forecastState.loading}
+            className="btn-secondary px-4 py-2 justify-center disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <span className={`material-symbols-outlined text-sm ${forecastState.refreshing ? 'animate-spin' : ''}`}>sync</span>
+            {forecastState.refreshing ? 'Refreshing' : 'Refresh forecast'}
+          </button>
+        </div>
+
+        {forecastState.loading && (
+          <div className="mt-6 flex h-52 items-center justify-center rounded-lg bg-[#f1f4f3] text-xs font-bold uppercase tracking-widest text-[#45474d]">
+            Loading forecast history
+          </div>
+        )}
+
+        {!forecastState.loading && forecastState.error && (
+          <div className={`mt-6 rounded-lg border px-5 py-4 ${forecastState.status === 503 ? 'border-[#c5c6cd]/40 bg-[#f1f4f3] text-[#45474d]' : 'border-[#ba1a1a]/20 bg-[#ffdad6] text-[#ba1a1a]'}`}>
+            <p className="text-xs font-bold uppercase tracking-widest">
+              {forecastState.status === 503
+                ? 'Forecast model unavailable'
+                : forecastState.status === 409
+                  ? 'Insufficient forecast history'
+                  : 'Forecast request failed'}
+            </p>
+            <p className="mt-1 text-sm font-semibold">{forecastState.error}</p>
+            {forecastState.status === 503 && (
+              <p className="mt-2 text-xs leading-relaxed">
+                The model gate requires Day+1 and Day+7 to beat persistence and weekly-naive baselines with MASE below 1.0. Weak forecasts are not displayed.
+              </p>
+            )}
+          </div>
+        )}
+
+        {!forecastState.loading && forecastData && (
+          <>
+            {forecastChartData.length === 0 && (
+              <div className="mt-6 flex h-40 items-center justify-center rounded-lg bg-[#f1f4f3] text-xs font-bold uppercase tracking-widest text-[#45474d]">
+                No observed forecast history is available
+              </div>
+            )}
+            {forecastChartData.length > 0 && (
+            <div className="mt-6 h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={forecastChartData} margin={{ top: 18, right: 24, left: 4, bottom: 8 }}>
+                  <CartesianGrid stroke="#e0e3e2" strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tickFormatter={formatDate} tick={{ fontSize: 10, fill: '#45474d' }} />
+                  <YAxis tick={{ fontSize: 10, fill: '#45474d' }} domain={['auto', 'auto']} />
+                  <Tooltip
+                    labelFormatter={formatDate}
+                    formatter={(value, name, item) => [formatNumber(value, 4), item?.payload?.horizon || name]}
+                  />
+                  {forecastThreshold !== null && (
+                    <ReferenceLine y={forecastThreshold} stroke="#805600" strokeDasharray="6 4" label="Warning threshold" />
+                  )}
+                  {forecastThreshold !== null && (
+                    <ReferenceLine y={forecastThreshold * 1.5} stroke="#ba1a1a" strokeDasharray="6 4" label="Critical threshold" />
+                  )}
+                  <Line
+                    type="linear"
+                    dataKey="observed"
+                    name="Observed daily P95"
+                    stroke="#1b263b"
+                    strokeWidth={2}
+                    dot={false}
+                    connectNulls={false}
+                    isAnimationActive={false}
+                  />
+                  <Scatter data={forecastPoints} dataKey="forecast" name="Forecast marker" fill="#006d37" isAnimationActive={false}>
+                    <ErrorBar dataKey="interval" direction="y" width={8} stroke="#006d37" strokeWidth={1.5} />
+                  </Scatter>
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+            )}
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+              {forecastPoints.map((point) => (
+                <div key={point.horizon} className="rounded-lg bg-[#f1f4f3] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-bold uppercase tracking-widest text-[#45474d]">{point.horizon}</p>
+                    <span className="text-xs font-bold text-[#051125]">{point.status}</span>
+                  </div>
+                  <p className="mt-2 text-2xl font-extrabold text-[#051125]">{formatNumber(point.forecast, 4)}</p>
+                  <p className="mt-1 text-[11px] text-[#45474d]">Target {formatDate(point.date)} with a 90% residual-calibrated interval.</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-3 text-[10px] font-bold uppercase tracking-widest text-[#45474d]">
+              <span>Model: {forecastData.model_version}</span>
+              <span>Generated: {new Date(forecastData.generated_at).toLocaleString()}</span>
+              <span>Threshold source: {forecastData.threshold_source}</span>
+            </div>
+          </>
+        )}
       </section>
 
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-6">
