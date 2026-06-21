@@ -4,10 +4,14 @@ from typing import Any
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional
 
-class UserCreate(BaseModel):
+class RequestOTP(BaseModel):
+    email: str
+
+class UserCreateWithOTP(BaseModel):
     full_name: str
     email: str
     password: str = Field(max_length=72)
+    otp: str
     
 class UserResponse(BaseModel): # <--- This must match exactly
     id: int

@@ -371,97 +371,103 @@ def get_current_admin(
     return current_user
 
 
-@app.post("/api/register", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
-def register_user(request: Request, user: schemas.UserCreate, db: Session = Depends(get_db)):
-    normalized_email = user.email.strip().lower()
-    
-    # Menangkap IP Address dan User Agent untuk keperluan audit
+# --- PENYIMPANAN SEMENTARA UNTUK OTP REGISTRASI (Tidak masuk Database) ---
+pending_registration_otps = {}
+
+@app.post("/api/register/request-otp")
+async def request_registration_otp(request: Request, data: schemas.RequestOTP, db: Session = Depends(get_db)):
+    normalized_email = data.email.strip().lower()
     client_ip, user_agent = _audit_context(request)
 
-    # 1. Gagal karena Email Sudah Terdaftar
+    # 1. Cek Email Terdaftar
     existing_user = db.query(models.User).filter(models.User.email == normalized_email).first()
     if existing_user:
-        _append_audit_log(
-            db,
-            user_email=normalized_email,
-            action="USER_REGISTRATION",
-            status_value="FAILED",
-            ip_address=client_ip,
-            browser_info=user_agent
-        )
-        db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered",
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered.")
 
-    # 2. Gagal karena Domain Tidak Diizinkan
+    # 2. Cek Domain
     allowed_domains = ["kalbeconsumerhealth.co.id", "gmail.com", "president.ac.id", "student.president.ac.id"]
     email_domain = normalized_email.split("@")[-1] if "@" in normalized_email else ""
     if email_domain not in allowed_domains:
-        _append_audit_log(
-            db,
-            user_email=normalized_email,
-            action="USER_REGISTRATION",
-            status_value="FAILED",
-            ip_address=client_ip,
-            browser_info=user_agent
-        )
-        db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Registration is restricted to official company domains only.",
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Registration is restricted to official company domains only.")
 
-    # 3. Gagal karena Kompleksitas Password Kurang
-    password_error = _password_policy_error(user.password)
+    # --- GENERATE OTP & SIMPAN DI MEMORY ---
+    otp_code = str(random.randint(100000, 999999))
+    pending_registration_otps[normalized_email] = {
+        "otp": otp_code,
+        "expires": datetime.utcnow() + timedelta(minutes=15)
+    }
+
+    # --- SEND VERIFICATION EMAIL ---
+    message = MessageSchema(
+        subject="SPMS - Verify Your Registration",
+        recipients=[normalized_email],
+        body=f"""
+        <div style="font-family: Arial, sans-serif; max-width: 500px; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px; color: #1b263b; text-align: center;">
+            <h3 style="font-size: 20px; font-weight: bold; margin-bottom: 8px;">Account Verification</h3>
+            <p style="font-size: 14px; color: #45474d; margin-bottom: 24px;">Please use the verification code below to continue your SPMS registration:</p>
+            
+            <div style="background-color: #f1f4f3; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+                <span style="font-size: 32px; font-weight: black; letter-spacing: 8px; color: #2ecc71;">{otp_code}</span>
+            </div>
+            
+            <p style="font-size: 12px; color: #777; line-height: 1.5;">This code will expire in 15 minutes.</p>
+        </div>
+        """,
+        subtype=MessageType.html,
+    )
+
+    try:
+        fm = FastMail(config=conf)
+        await fm.send_message(message)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to send verification email. Please try again.")
+
+    _append_audit_log(db, user_email=normalized_email, action="OTP_REGISTRATION_SENT", status_value="SUCCESS", ip_address=client_ip, browser_info=user_agent)
+    db.commit()
+
+    return {"message": "OTP sent to your email. Please verify to continue registration."}
+
+
+@app.post("/api/register", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
+def register_user(request: Request, user_data: schemas.UserCreateWithOTP, db: Session = Depends(get_db)):
+    normalized_email = user_data.email.strip().lower()
+    client_ip, user_agent = _audit_context(request)
+
+    pending_data = pending_registration_otps.get(normalized_email)
+    if not pending_data:
+        raise HTTPException(status_code=400, detail="No pending registration found. Please request OTP first.")
+    
+    if pending_data["otp"] != user_data.otp:
+        _append_audit_log(db, user_email=normalized_email, action="USER_REGISTRATION", status_value="FAILED_INVALID_OTP", ip_address=client_ip, browser_info=user_agent)
+        db.commit()
+        raise HTTPException(status_code=400, detail="Invalid OTP code.")
+    
+    if datetime.utcnow() > pending_data["expires"]:
+        del pending_registration_otps[normalized_email]
+        raise HTTPException(status_code=400, detail="OTP code has expired. Please request a new one.")
+
+    existing_user = db.query(models.User).filter(models.User.email == normalized_email).first()
+    if existing_user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+
+    password_error = _password_policy_error(user_data.password)
     if password_error:
-        _append_audit_log(
-            db,
-            user_email=normalized_email,
-            action="USER_REGISTRATION",
-            status_value="FAILED",
-            ip_address=client_ip,
-            browser_info=user_agent
-        )
-        db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=password_error,
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=password_error)
 
-    print(f"--- DEBUG: Security validation passed for user: {normalized_email} ---")
-
-    # Proses simpan data pengguna baru
     new_user = models.User(
-        full_name=user.full_name,
+        full_name=user_data.full_name,
         email=normalized_email,
-        hashed_password=security.get_password_hash(user.password),
+        hashed_password=security.get_password_hash(user_data.password),
+        is_active=True 
     )
     db.add(new_user)
-    
-    # 4. Sukses Registrasi (Catat log status SUCCESS)
-    _append_audit_log(
-        db,
-        user_email=normalized_email,
-        action="USER_REGISTRATION",
-        status_value="SUCCESS",
-        ip_address=client_ip,
-        browser_info=user_agent
-    )
-    
     db.commit()
     db.refresh(new_user)
 
-    _record_audit_log(
-        db,
-        request=request,
-        user_email=new_user.email,
-        action="USER_REGISTER",
-        status_value="SUCCESS",
-    )
-    return new_user
+    del pending_registration_otps[normalized_email]
 
+    _record_audit_log(db, request=request, user_email=new_user.email, action="USER_REGISTER", status_value="SUCCESS")
+    return new_user
 
 @app.post("/api/login", response_model=schemas.Token)
 @limiter.limit("5/minute")
