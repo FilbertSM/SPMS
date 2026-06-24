@@ -9,19 +9,18 @@ const Login = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [email, setEmail] = useState(() => localStorage.getItem('spms_remembered_email') || '');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(() => Boolean(localStorage.getItem('spms_remembered_email'))); // New: Remember Me
-  const [showPassword, setShowPassword] = useState(false); // New: Show/Hide Password
+  const [rememberMe, setRememberMe] = useState(() => Boolean(localStorage.getItem('spms_remembered_email'))); 
+  const [showPassword, setShowPassword] = useState(false); 
   const [emailError, setEmailError] = useState(null); 
   const [loginError, setLoginError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [successMsg, setSuccessMsg] = useState(null);
 
-  // --- VALIDATION LOGIC (UPDATED: PASSED COMPLEXITY REMOVED) ---
+  // --- VALIDATION LOGIC ---
   const validateForm = () => {
     setEmailError(null);
     setLoginError(null);
-    // 1. Strict Email Validation (Regex) - Tetap dipertahankan agar format email benar
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(email)) {
       setEmailError("Please enter a valid company email address.");
@@ -48,6 +47,7 @@ const Login = () => {
         .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(details[key]))
         .join('&');
 
+      // 1. Minta Token Login
       const response = await fetch('http://127.0.0.1:8000/api/login', {
         method: 'POST',
         headers: {
@@ -63,6 +63,27 @@ const Login = () => {
 
       const data = await response.json();
       localStorage.setItem('spms_token', data.access_token);
+
+      // --- TAMBAHAN BARU: AMBIL DATA USER UNTUK MENYIMPAN ROLE ---
+      try {
+        const userResponse = await fetch('http://127.0.0.1:8000/api/users/me', {
+          headers: {
+            'Authorization': `Bearer ${data.access_token}`,
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          localStorage.setItem('role', userData.role); // Simpan role ke localStorage
+        } else {
+          localStorage.setItem('role', 'technician'); // Fallback aman
+        }
+      } catch (userErr) {
+        console.error("Gagal mengambil data user:", userErr);
+        localStorage.setItem('role', 'technician'); // Fallback aman
+      }
+      // ------------------------------------------------------------
       
       // Logika Remember Me
       if (rememberMe) {
@@ -75,11 +96,11 @@ const Login = () => {
       setTimeout(() => { navigate('/app'); }, 1000);
       
     } catch (err) {
-      // Set error login disini
       setLoginError("Login failed: Incorrect email or password.");
       setIsLoading(false);
     }
   };
+
   return (
     <div className="auth-container">
       {/* --- TOAST NOTIFICATION --- */}

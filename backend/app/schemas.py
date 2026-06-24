@@ -13,6 +13,10 @@ class UserCreateWithOTP(BaseModel):
     password: str = Field(max_length=72)
     otp: str
     
+class UserUpdate(BaseModel):
+    role: str
+    is_active: bool
+    
 class UserResponse(BaseModel): # <--- This must match exactly
     id: int
     full_name: str
@@ -20,8 +24,9 @@ class UserResponse(BaseModel): # <--- This must match exactly
     role: str
     is_active: bool
     email_notifications: bool
+    created_at: datetime | None = None
 
-    class Config:
+class Config:
         from_attributes = True
 
 class Token(BaseModel):

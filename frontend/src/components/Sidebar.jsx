@@ -1,15 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
-const navItems = [
-  { path: '/app', icon: 'dashboard', label: 'Dashboard' },
-  { path: '/app/pma', icon: 'trending_up', label: 'PMA' },
-  { path: '/app/vibration', icon: 'vibration', label: 'Vibration' },
-  { path: '/app/alerts', icon: 'warning', label: 'Alerts' },
-  { path: '/app/audit', icon: 'security', label: 'Audit Logs' },
-  { path: '/app/settings', icon: 'settings', label: 'Settings' },
-];
-
 const secondaryItems = [
   { path: '/app/support', icon: 'help', label: 'Support' },
   { path: '/app/status', icon: 'analytics', label: 'Status' },
@@ -17,12 +8,19 @@ const secondaryItems = [
 
 const Sidebar = () => {
   const location = useLocation();
+  const role = localStorage.getItem('role') || 'technician';
+  const isAdmin = role === 'admin';
 
-  // Fungsi utilitas mengontrol active/highlight capsule secara dinamis & presisi
+  // Susunan Navigasi dinamis tanpa menu Settings terpisah
+  const navItems = [
+    { path: '/app', icon: 'dashboard', label: 'Dashboard' },
+    { path: '/app/pma', icon: 'trending_up', label: 'PMA' },
+    { path: '/app/vibration', icon: 'vibration', label: 'Vibration' },
+    { path: '/app/alerts', icon: 'warning', label: 'Alerts' },
+  ];
+
   const getMenuClasses = (path) => {
-    const isActive = location.pathname === path || (path === '/app' && location.pathname === '/app/');
-    
-    // Base class asli tetap utuh agar tidak menggeser alignment teks menu
+    const isActive = location.pathname.startsWith(path) && (path !== '/app' || location.pathname === '/app/');
     const baseClasses = "px-4 py-3 flex items-center gap-3 transition-all text-sm rounded-l-lg ml-2 font-medium";
     
     return isActive
@@ -77,14 +75,12 @@ const Sidebar = () => {
 
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-[#c5c6cd]/30 bg-white/95 backdrop-blur px-2 py-2 shadow-[0_-8px_20px_rgba(5,17,37,0.08)]">
         <div className="grid grid-cols-5 gap-1">
-          {[...navItems.slice(0, 4), secondaryItems[1]].map((item) => (
+          {navItems.slice(0, 4).concat(secondaryItems[1]).map((item) => (
             <Link
               key={item.path}
               to={item.path}
               className={`flex min-h-12 flex-col items-center justify-center rounded-lg px-1 text-[10px] font-bold ${
-                isMobileActive(item.path)
-                  ? 'bg-[#1b263b] text-[#6bfe9c]'
-                  : 'text-[#45474d] hover:bg-[#f1f4f3]'
+                isMobileActive(item.path) ? 'bg-[#1b263b] text-[#6bfe9c]' : 'text-[#45474d] hover:bg-[#f1f4f3]'
               }`}
             >
               <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
