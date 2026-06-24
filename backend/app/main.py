@@ -754,13 +754,13 @@ def get_all_users(
 @app.patch("/api/users/{user_id}")
 def update_user_role(
     user_id: int,
-    user_update: schemas.UserUpdate, # Pastikan schema ini ada
+    user_update: schemas.UserUpdate,
     current_user: models.User = Depends(get_current_admin),
     db: Session = Depends(get_db)
 ):
     user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    if current_user.role.lower() == "admin" and user_update.role.lower() == "super_admin":
+        raise HTTPException(status_code=403, detail="Admins cannot assign Super Admin role.")
     
     # Update data
     user.role = user_update.role

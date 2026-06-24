@@ -142,15 +142,19 @@ const AdminDashboard = () => {
 
             <div className="bg-white rounded-xl shadow-sm border border-[#c5c6cd]/20 overflow-x-auto">
               <table className="min-w-full w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-[#f8faf9] border-b border-[#c5c6cd]/30">
+               <thead>
+                 <tr className="bg-[#f8faf9] border-b border-[#c5c6cd]/30">
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#75777d]">Personnel Name</th>
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#75777d]">Email Address</th>
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#75777d]">Access Role</th>
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#75777d]">Status</th>
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#75777d]">Join Date</th>
+                    
+                    {/* Kolom Action hanya muncul untuk Super Admin */}
+                    {isSuperAdmin && (
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-[#75777d] text-right">Actions</th>
-                  </tr>
+                    )}
+                 </tr>
                 </thead>
                 <tbody className="divide-y divide-[#ebeeed]">
                   {isLoading ? (
@@ -179,30 +183,29 @@ const AdminDashboard = () => {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-xs font-medium text-[#75777d]">
-                          {/* FIX: Pengecekan aman untuk created_at agar tidak Invalid Date */}
                           {user.created_at ? new Date(user.created_at).toLocaleDateString('en-GB') : '-'}
                         </td>
-                        <td className="px-6 py-4 text-right flex justify-end gap-2">
-                            {/* Tombol Edit (Bisa dilihat Admin & Super Admin) */}
-                            <button 
-                                onClick={() => openEditModal(user)}
-                                className="p-1.5 text-[#75777d] hover:text-[#1b263b] hover:bg-[#e0e3e2] rounded-md transition-all"
-                                title="Edit User"
-                            >
-                                <span className="material-symbols-outlined text-[18px]">edit</span>
-                            </button>
-
-                            {/* Tombol Delete (Hanya muncul untuk Super Admin) */}
-                            {isSuperAdmin && (
+                       <td className="px-6 py-4 text-right flex justify-end gap-2">
+                           {isSuperAdmin && (
+                             <td className="px-6 py-4 text-right flex justify-end gap-2">
                                 <button 
-                                onClick={() => handleDeleteUser(user)}
-                                className="p-1.5 text-[#ba1a1a] hover:bg-[#ffdad6] rounded-md transition-all"
-                                title="Permanently Delete User"
+                                    onClick={() => openEditModal(user)}
+                                    className="p-1.5 text-[#75777d] hover:text-[#1b263b] hover:bg-[#e0e3e2] rounded-md transition-all"
+                                    title="Edit User"
                                 >
-                                <span className="material-symbols-outlined text-[18px]">delete</span>
+                                    <span className="material-symbols-outlined text-[18px]">edit</span>
                                 </button>
+
+                                <button 
+                                    onClick={() => handleDeleteUser(user)}
+                                    className="p-1.5 text-[#ba1a1a] hover:bg-[#ffdad6] rounded-md transition-all"
+                                    title="Permanently Delete User"
+                                >
+                                    <span className="material-symbols-outlined text-[18px]">delete</span>
+                                </button>
+                             </td>
                             )}
-                            </td>
+                        </td>
                       </tr>
                     ))
                   )}
