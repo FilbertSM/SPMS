@@ -64,6 +64,7 @@ function App() {
             <Route path="support" element={<Suspense fallback={<PageFallback />}><Support /></Suspense>} />
             <Route path="status" element={<Suspense fallback={<PageFallback />}><SystemStatus /></Suspense>} />
             <Route path="maintenance" element={<Suspense fallback={<PageFallback />}><MaintenanceTicket /></Suspense>} />
+            <Route path="chat" element={<Suspense fallback={<PageFallback />}><SPMSChatDashboard /></Suspense>} />
           </Route>
         </Route>
 
