@@ -124,11 +124,15 @@ def _append_audit_log(
         .order_by(models.AuditLog.id.desc())
         .first()
     )
+    
+    # Membuang microsecond agar sinkron dengan format default MariaDB
+    current_time = datetime.now(timezone.utc).replace(microsecond=0)
+
     log = models.AuditLog(
-        timestamp=datetime.now(timezone.utc),
+        timestamp=current_time,
         user_email=user_email,
         action=action,
-        status=status_value,
+        status=status_value,  
         ip_address=ip_address,
         browser_info=browser_info,
         previous_hash=previous.record_hash if previous else None,
@@ -370,7 +374,8 @@ def get_current_admin(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if current_user.role != "admin":
+    # Sekarang mengizinkan baik 'admin' maupun 'super_admin'
+    if current_user.role.lower() not in ["admin", "super_admin"]:
         client_ip, user_agent = _audit_context(request)
         _append_audit_log(
             db,
@@ -752,6 +757,70 @@ def export_audit_logs(
 def read_users_me(current_user: models.User = Depends(get_current_user)):
     return current_user
 
+@app.get("/api/users", response_model=list[schemas.UserResponse])
+def get_all_users(
+    current_user: models.User = Depends(get_current_user), # Just use get_current_user
+    db: Session = Depends(get_db),
+):
+    # ALLOW BOTH ROLES
+    allowed_roles = ["admin", "super_admin"]
+    if current_user.role.lower() not in allowed_roles:
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+    
+    users = db.query(models.User).order_by(models.User.created_at.desc()).all()
+    return users
+
+@app.patch("/api/users/{user_id}")
+def update_user_role(
+    user_id: int,
+    user_update: schemas.UserUpdate,
+    current_user: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if current_user.role.lower() == "admin" and user_update.role.lower() == "super_admin":
+        raise HTTPException(status_code=403, detail="Admins cannot assign Super Admin role.")
+    
+    # Update data
+    user.role = user_update.role
+    user.is_active = user_update.is_active
+    db.commit()
+    return {"message": "User updated successfully"}
+
+@app.delete("/api/users/{user_id}")
+def delete_user(
+    user_id: int,
+    request: Request,
+    current_user: models.User = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    if current_user.role.lower() != "super_admin":
+        _record_audit_log(
+            db, request=request, user_email=current_user.email,
+            action="UNAUTHORIZED_DELETE_ATTEMPT", status_value="FAILED"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Access Denied: Only Super Admin can deactivate users."
+        )
+
+    user_to_deactivate = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user_to_deactivate:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user_to_deactivate.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Super Admin cannot deactivate their own account.")
+
+    # SOFT DELETE: Ubah status menjadi non-aktif alih-alih menghapus permanen
+    user_to_deactivate.is_active = False
+    
+    _record_audit_log(
+        db, request=request, user_email=current_user.email,
+        action=f"USER_SOFT_DELETE: {user_to_deactivate.email}", status_value="SUCCESS"
+    )
+    db.commit()
+
+    return {"message": "User deactivated successfully."}
 
 @app.patch("/api/users/me/preferences")
 def update_user_preferences(

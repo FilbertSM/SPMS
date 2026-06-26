@@ -10,7 +10,8 @@ import SPMSChatDashboard from './pages/SPMSChatbot';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Alerts = lazy(() => import('./pages/Alerts'));
-const AuditLogs = lazy(() => import('./pages/AuditLogs'));
+// Kita ubah lazy import ini menjadi AdminDashboard
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard')); 
 const Settings = lazy(() => import('./pages/Settings'));
 const Profile = lazy(() => import('./pages/Profile'));
 const PmaDashboard = lazy(() => import('./pages/PMAChart'));
@@ -53,19 +54,19 @@ function App() {
               element={<Suspense fallback={<PageFallback />}><Dashboard /></Suspense>}
             />
             <Route path="alerts" element={<Suspense fallback={<PageFallback />}><Alerts /></Suspense>} />
-            <Route path="audit" element={<Suspense fallback={<PageFallback />}><AuditLogs /></Suspense>} />
-            <Route path="settings" element={<Suspense fallback={<PageFallback />}><Settings /></Suspense>} />
+            
+            {/* Ubah path ini dari 'audit' ke 'admin' */}
+            <Route path="admin" element={<Suspense fallback={<PageFallback />}><AdminDashboard /></Suspense>} />
+            
             <Route path="profile" element={<Suspense fallback={<PageFallback />}><Profile /></Suspense>} />
             <Route path="pma" element={<Suspense fallback={<PageFallback />}><PmaDashboard /></Suspense>} />
             <Route path="vibration" element={<Suspense fallback={<PageFallback />}><MotorChart /></Suspense>} />
             <Route path="support" element={<Suspense fallback={<PageFallback />}><Support /></Suspense>} />
             <Route path="status" element={<Suspense fallback={<PageFallback />}><SystemStatus /></Suspense>} />
-            <Route path="maintenance" element={<Suspense fallback={<PageFallback />}><MaintenanceTicket /></Suspense>} />np
-            <Route path="chat" element={<Suspense fallback={<PageFallback />}><SPMSChatDashboard /></Suspense>} />
+            <Route path="maintenance" element={<Suspense fallback={<PageFallback />}><MaintenanceTicket /></Suspense>} />
           </Route>
         </Route>
 
-        {/* Catch-all untuk URL acak yang tidak terdaftar, lempar kembali ke root */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
