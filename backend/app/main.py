@@ -7,6 +7,9 @@ from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import urlencode
 
+import os
+import shutil
+
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -38,6 +41,22 @@ from app.ml_integration.window_builder import (
 )
 import random
 from datetime import timedelta
+
+from fastapi import FastAPI, APIRouter, UploadFile, File, Form, HTTPException
+from pydantic import BaseModel
+from typing import Optional
+from app.core.rag_engine.rag_engine import run_ingestion_pipeline, SPMSChatEngine
+
+_global_chat_engine = None
+
+def get_chat_engine():
+    global _global_chat_engine
+    if _global_chat_engine is not None:
+        return _global_chat_engine
+    print("Waking up AI models and loading into RAM for the first time...")
+    from app.core.rag_engine.rag_engine import SPMSChatEngine # Safe local import
+    _global_chat_engine = SPMSChatEngine()
+    return _global_chat_engine
 
 # --- INISIALISATION LIMITER ---
 limiter = Limiter(key_func=get_remote_address)
@@ -1566,6 +1585,69 @@ def read_dashboard_summary(
         "artifact_status": inference_service.readiness_status(),
         "recent_alerts": recent_alerts,
     }
+
+router = APIRouter(prefix="/api/rag", tags=["RAG Document Intelligence"])
+class ChatRequest(BaseModel):
+    question: str
+    machine_filter: Optional[str] = None
+    target_language: Optional[str] = "English" # Tell FastAPI to expect this!
+
+@app.post("/api/rag/upload")
+async def upload_manual(
+    file: UploadFile = File(...),
+    machine_type: str = Form(...)  # Receives "PMA", "Fette", etc., from the dropdown
+):
+    try:
+        # Validate input to ensure data sanitization
+        machine_type = machine_type.strip().upper()
+        if not machine_type:
+            raise HTTPException(status_code=400, detail="Machine type tag is required.")
+
+        # Save the file using its real name instead of a hardcoded string
+        # to prevent files from overwriting each other
+        clean_filename = f"{machine_type}_{file.filename}"
+        target_dir = os.path.join("storage", "manuals")
+        os.makedirs(target_dir, exist_ok=True)
+        
+        saved_file_path = os.path.join(target_dir, clean_filename)
+        with open(saved_file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        # Run the upgraded ingestion pipeline and pass the category tag
+        run_ingestion_pipeline(saved_file_path, machine_type)
+
+        global _global_chat_engine
+        _global_chat_engine = None
+        
+        return {"status": "success", "message": f"Successfully indexed into {machine_type} memory."}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@app.post("/api/rag/chat")
+async def execute_rag_query(payload: ChatRequest):
+    """Answers user queries grounded securely inside engineering documentation."""
+    try:
+        # Ask the gatekeeper for the AI. 
+        # (It will be slow on the first question, but lightning fast on all future questions).
+        engine = get_chat_engine()
+        
+        # THE FIX: Explicitly pass target_language down to the engine!
+        response_data = engine.ask(
+            question=payload.question, 
+            machine_filter=payload.machine_filter,
+            target_language=payload.target_language  # <-- THIS IS THE MISSING WIRE!
+        )
+        
+        return response_data
+        
+    except FileNotFoundError as fnf:
+        raise HTTPException(status_code=404, detail=str(fnf))
+    except Exception as e:
+        if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+            raise HTTPException(status_code=429, detail="Gemini project quota exhausted. Please retry in 60 seconds.")
+        raise HTTPException(status_code=500, detail=f"Execution Error: {str(e)}")
 
 
 if __name__ == "__main__":

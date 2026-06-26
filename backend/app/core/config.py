@@ -5,6 +5,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     PROJECT_NAME: str = "SPMS API"
     API_V1_STR: str = "/api/v1"
+    GOOGLE_API_KEY: str | None = None
     
     # Security
     SECRET_KEY: str = "fallback_secret_key_change_in_production"

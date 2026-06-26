@@ -6,6 +6,7 @@ import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
 import ProtectedRoute from './components/Routes'; 
 import ForgotPassword from './pages/ForgotPassword';
+import SPMSChatDashboard from './pages/SPMSChatbot';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Alerts = lazy(() => import('./pages/Alerts'));
@@ -39,6 +40,7 @@ function App() {
         <Route path="/profile" element={<Navigate to="/app/profile" replace />} />
         <Route path="/pma-dashboard" element={<Navigate to="/app/pma" replace />} />
         <Route path="/vibration-chart" element={<Navigate to="/app/vibration" replace />} />
+        <Route path="/chat" element={<Navigate to="/app/chat" />} />
 
         <Route element={<ProtectedRoute />}>
           {/* Redirect root ke /app */}
@@ -59,6 +61,7 @@ function App() {
             <Route path="support" element={<Suspense fallback={<PageFallback />}><Support /></Suspense>} />
             <Route path="status" element={<Suspense fallback={<PageFallback />}><SystemStatus /></Suspense>} />
             <Route path="maintenance" element={<Suspense fallback={<PageFallback />}><MaintenanceTicket /></Suspense>} />np
+            <Route path="chat" element={<Suspense fallback={<PageFallback />}><SPMSChatDashboard /></Suspense>} />
           </Route>
         </Route>
 
