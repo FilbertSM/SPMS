@@ -259,7 +259,7 @@ const SPMSChatDashboard = () => {
                 type="file" 
                 accept=".pdf" 
                 id="file-upload" 
-                // onChange={handleFileChange} 
+                onChange={handleFileChange} 
                 disabled={isUploading}
                 className="hidden" 
               />
@@ -273,7 +273,7 @@ const SPMSChatDashboard = () => {
             </div>
 
             <button
-              // onClick={handleManualUpload}
+              onClick={handleManualUpload}
               disabled={!selectedFile || isUploading}
               className={`w-full mt-3 p-2.5 text-white border-none rounded font-bold text-sm shadow-sm transition-all ${
                 !selectedFile || isUploading 
