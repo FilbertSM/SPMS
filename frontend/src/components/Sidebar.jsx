@@ -16,7 +16,7 @@ const Sidebar = () => {
     { path: '/app', icon: 'dashboard', label: 'Dashboard' },
     { path: '/app/pma', icon: 'trending_up', label: 'PMA' },
     { path: '/app/vibration', icon: 'vibration', label: 'Vibration' },
-    { path: '/app/chat', icon: 'chat', label: 'Chat' },
+    { path: '/app/chat', icon: 'chat', label: 'Chatbot' },
     { path: '/app/alerts', icon: 'warning', label: 'Alerts' },
   ];
 

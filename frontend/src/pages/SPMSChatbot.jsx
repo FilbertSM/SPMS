@@ -63,7 +63,7 @@ const SPMSChatDashboard = () => {
   const [selectedLanguage, setSelectedLanguage] = useState("English");
 
 // Dynamic Equipment States
-  const [machineList, setMachineList] = useState(['PMA Granulator', 'Fette Tablet Press', 'Wetmill']);
+  const [machineList, setMachineList] = useState(['PMA', 'Fette Tablet Press', 'Wetmill']);
   const [isAddingCustom, setIsAddingCustom] = useState(false);
   const [customMachineName, setCustomMachineName] = useState('');
   
@@ -173,7 +173,7 @@ const SPMSChatDashboard = () => {
       
       {/* Top Header Bar */}
       <header className="py-4 px-5 bg-slate-800 text-white flex justify-between items-center shadow-md z-10">
-        <h2 className="m-0 text-lg font-medium tracking-wide">🛠️ SPMS | Document Intelligence Control Panel</h2>
+        <h2 className="m-0 text-lg font-medium tracking-wide">SPMS | Document Loader and Chatbot</h2>
       </header>
 
       {/* Main Workspace Layout */}
@@ -182,19 +182,26 @@ const SPMSChatDashboard = () => {
         {/* ========================================== */}
         {/* Left Control Panel: Document Operations    */}
         {/* ========================================== */}
-        <aside className="w-80 bg-white border-r border-slate-200 p-5 flex flex-col gap-5 overflow-y-auto">
-          <div>
-            <h3 className="m-0 mb-2.5 text-sm font-semibold text-slate-700">Knowledge Base Management</h3>
-            <p className="text-xs text-slate-500 m-0 mb-4 leading-relaxed">Upload a technical machine manual or system guide to refresh the underlying Chroma vector index.</p>
+        <aside className="w-[360px] bg-white border-r border-slate-200 flex flex-col shadow-[2px_0_8px_-4px_rgba(0,0,0,0.05)] z-10 overflow-y-auto shrink-0">
+          
+          {/* Section Header */}
+          <div className="p-6 border-b border-slate-100 shrink-0">
+            <h3 className="m-0 mb-1.5 text-3xl font-bold text-slate-800">Document Uploader</h3>
+            <p className="text-base text-slate-500 m-0 leading-relaxed">
+              Upload technical manuals to update the Chroma vector index.
+            </p>
+          </div>
+
+          {/* Main Form Area */}
+          <div className="p-6 flex flex-col gap-6">
             
-            {/* --- SMART DYNAMIC MACHINE SELECTION DROPDOWN --- */}
-            <div className="mb-6 bg-white p-4 rounded-lg border border-slate-100 shadow-sm">
-              <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">
-                Active Equipment Module
+            {/* 1. Equipment Dropdown */}
+            <div className="flex flex-col gap-2">
+              <label className="text-[14px] font-bold text-slate-500 uppercase tracking-wider">
+                Target Machine
               </label>
               
               {!isAddingCustom ? (
-                // 1. The Standard Dropdown
                 <select
                   value={activeMachine}
                   onChange={(e) => {
@@ -204,7 +211,7 @@ const SPMSChatDashboard = () => {
                       setActiveMachine(e.target.value);
                     }
                   }}
-                  className="w-full p-2 border border-slate-300 rounded-md bg-slate-50 text-slate-800 outline-none cursor-pointer text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                  className="w-full p-2.5 border border-slate-300 rounded-lg bg-slate-50 text-slate-800 text-lg outline-none cursor-pointer hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all shadow-sm"
                 >
                   {machineList.map(machine => (
                     <option key={machine} value={machine}>{machine}</option>
@@ -213,14 +220,13 @@ const SPMSChatDashboard = () => {
                   <option value="ADD_NEW" className="text-blue-600 font-semibold">+ Add New Equipment...</option>
                 </select>
               ) : (
-                // 2. The Custom Text Input Override
                 <div className="flex gap-2">
                   <input 
                     type="text" 
                     placeholder="Type machine name..."
                     value={customMachineName}
                     onChange={(e) => setCustomMachineName(e.target.value)}
-                    className="flex-1 p-2 border border-slate-300 rounded-md bg-slate-50 text-slate-800 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    className="flex-1 p-2.5 border border-slate-300 rounded-lg bg-slate-50 text-slate-800 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                     autoFocus
                   />
                   <button 
@@ -233,7 +239,7 @@ const SPMSChatDashboard = () => {
                         setCustomMachineName('');
                       }
                     }}
-                    className="py-2 px-3 bg-emerald-500 text-white border-none rounded-md cursor-pointer font-bold text-xs hover:bg-emerald-600 transition-colors"
+                    className="py-2.5 px-3 bg-emerald-500 text-white border-none rounded-lg cursor-pointer font-bold text-xs hover:bg-emerald-600 transition-colors shadow-sm"
                   >
                     Save
                   </button>
@@ -242,76 +248,104 @@ const SPMSChatDashboard = () => {
                       setIsAddingCustom(false);
                       setCustomMachineName('');
                     }}
-                    className="py-2 px-3 bg-slate-200 text-slate-600 border-none rounded-md cursor-pointer font-bold text-xs hover:bg-slate-300 transition-colors"
+                    className="py-2.5 px-3 bg-slate-200 text-slate-600 border-none rounded-lg cursor-pointer font-bold text-xs hover:bg-slate-300 transition-colors"
                   >
                     Cancel
                   </button>
                 </div>
               )}
-              <p className="text-[11px] text-slate-400 mt-2 m-0 leading-normal">
-                Uploads and searches will be strictly isolated to this module.
+              <p className="text-[14px] text-slate-400 m-0 mt-1">
+                Isolates knowledge base context to this module.
               </p>
             </div>
-            {/* --- END SMART DROPDOWN --- */}
 
-            <div className="border-2 border-dashed border-slate-300 rounded-md p-4 text-center bg-slate-50 hover:bg-slate-100 transition-colors">
-              <input 
-                type="file" 
-                accept=".pdf" 
-                id="file-upload" 
-                onChange={handleFileChange} 
-                disabled={isUploading}
-                className="hidden" 
-              />
-              <label 
-                htmlFor="file-upload" 
-                className={`text-sm font-bold text-blue-600 select-none ${isUploading ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+            {/* 2. Modern Dropzone & Button Group */}
+            <div className="flex flex-col gap-3">
+              {/* Dropzone */}
+              <div className={`relative flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-xl transition-all duration-200 group ${
+                selectedFile 
+                  ? 'border-blue-400 bg-blue-50' 
+                  : 'border-slate-300 bg-slate-50 hover:bg-slate-100 hover:border-slate-400'
+              }`}>
+                <input 
+                  type="file" 
+                  accept=".pdf" 
+                  id="file-upload" 
+                  onChange={handleFileChange} 
+                  disabled={isUploading}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-10" 
+                />
+                
+                {/* Dynamic Dropzone Content */}
+                {!selectedFile ? (
+                  <>
+                    <div className="text-3xl mb-2 opacity-50 group-hover:scale-110 transition-transform duration-200">📄</div>
+                    <span className="text-sm font-semibold text-slate-700">Click to browse PDF</span>
+                    <span className="text-[11px] text-slate-500 mt-1">Maximum file size: 50MB</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-3xl mb-2">✅</div>
+                    <span className="text-sm font-bold text-blue-700 text-center truncate w-full px-2">
+                      {selectedFile.name}
+                    </span>
+                    <span className="text-[11px] text-blue-500 mt-1 font-medium">Click to change file</span>
+                  </>
+                )}
+              </div>
+
+              {/* Action Button */}
+              <button
+                onClick={handleManualUpload}
+                disabled={!selectedFile || isUploading}
+                className={`w-full py-3 px-4 rounded-lg font-bold text-lg shadow-sm transition-all flex items-center justify-center gap-2 ${
+                  !selectedFile || isUploading 
+                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
+                    : 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md hover:shadow-blue-200 active:scale-[0.98]'
+                }`}
               >
-                {selectedFile ? '🔄 Change PDF File' : '📁 Select Technical PDF'}
-              </label>
-              {selectedFile && <div className="text-xs mt-2 text-slate-600 break-all">{selectedFile.name}</div>}
+                {isUploading ? (
+                  <>
+                    <span className="animate-spin text-lg">⏳</span> Compiling...
+                  </>
+                ) : (
+                  'Upload & Parse Manual'
+                )}
+              </button>
             </div>
 
-            <button
-              onClick={handleManualUpload}
-              disabled={!selectedFile || isUploading}
-              className={`w-full mt-3 p-2.5 text-white border-none rounded font-bold text-sm shadow-sm transition-all ${
-                !selectedFile || isUploading 
-                  ? 'bg-slate-300 cursor-not-allowed' 
-                  : 'bg-blue-600 cursor-pointer hover:bg-blue-700 active:scale-[0.99]'
-              }`}
-            >
-              {isUploading ? 'Compiling Embeddings...' : 'Upload & Parse Manual'}
-            </button>
-
+            {/* Progress Bar (Only visible when uploading) */}
             {isUploading && (
-              <div className="mt-3">
-                <div className="flex justify-between text-[11px] text-slate-500 mb-1">
-                  <span>Uploading File Stream</span>
+              <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
+                <div className="flex justify-between text-[11px] font-semibold text-slate-600 mb-2">
+                  <span>Parsing Embeddings</span>
                   <span>{uploadProgress}%</span>
                 </div>
-                <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
                   <div 
-                    className="bg-emerald-500 h-full transition-all duration-200 ease-out" 
+                    className="bg-blue-500 h-full transition-all duration-300 ease-out relative" 
                     style={{ width: `${uploadProgress}%` }}
-                  ></div>
+                  >
+                    <div className="absolute top-0 left-0 bottom-0 right-0 bg-white/20 animate-pulse"></div>
+                  </div>
                 </div>
               </div>
             )}
-          </div>
 
-          {/* Operation Status Notifications */}
-          {systemNotification.text && (
-            <div className={`p-3 rounded border text-xs leading-relaxed transition-all shadow-sm ${
-              systemNotification.type === 'success' 
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-                : systemNotification.type === 'error' 
-                ? 'bg-rose-50 text-rose-800 border-rose-200' 
-                : 'bg-blue-50 text-blue-800 border-blue-200'
-            }`}>
-              {systemNotification.text}
-            </div>
-          )}
+            {/* Operation Status Notifications */}
+            {systemNotification.text && (
+              <div className={`p-3 rounded-lg border text-xs leading-relaxed transition-all shadow-sm mt-auto ${
+                systemNotification.type === 'success' 
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                  : systemNotification.type === 'error' 
+                  ? 'bg-rose-50 text-rose-800 border-rose-200' 
+                  : 'bg-blue-50 text-blue-800 border-blue-200'
+              }`}>
+                {systemNotification.text}
+              </div>
+            )}
+
+          </div>
         </aside>
 
         {/* ========================================== */}
@@ -320,16 +354,16 @@ const SPMSChatDashboard = () => {
         <main className="flex-1 flex flex-col bg-slate-50">
           
           {/* --- NEW CHAT HEADER (Language Toggle Moved Here) --- */}
-          <div className="flex justify-between items-center py-3.5 px-6 bg-white border-b border-slate-200 shadow-sm z-0">
-            <h2 className="m-0 text-sm font-semibold text-slate-800 tracking-wide">
-              SPMS Assistant <span className="text-xs font-normal text-slate-400 ml-2">({activeMachine})</span>
+          <div className="flex justify-between items-center py-5 px-8 bg-white border-b border-slate-200 shadow-sm z-0">
+            <h2 className="m-0 text-xl font-bold text-slate-800 tracking-wide">
+              SPMS Chatbot <span className="text-xl font-medium text-slate-600 ml-2">({activeMachine})</span>
             </h2>
             
             <button 
               onClick={() => setSelectedLanguage((prev) => prev === "English" ? "Bahasa Indonesia" : "English")}
-              className="py-1 px-4 bg-blue-50 text-blue-700 border border-blue-200 rounded-full cursor-pointer font-bold text-xs tracking-wide transition-all hover:bg-blue-100 hover:border-blue-300 active:scale-[0.97]"
+              className="py-2 px-6 bg-blue-50 text-blue-700 border-2 border-blue-200 rounded-full cursor-pointer font-bold text-base tracking-wide transition-all hover:bg-blue-100 hover:border-blue-300 hover:shadow-md active:scale-[0.97] shadow-sm flex items-center gap-2"
             >
-              Language: {selectedLanguage === "English" ? "🇺🇸 EN" : "🇮🇩 ID"}
+              Language: {selectedLanguage === "English" ? "English" : "Indonesian"}
             </button>
           </div>
 
@@ -337,7 +371,7 @@ const SPMSChatDashboard = () => {
           <div className="flex-1 p-5 overflow-y-auto flex flex-col gap-4">
             {messages.length === 0 && !isQuerying && (
               <div className="m-auto text-center text-slate-400 max-w-[400px] select-none">
-                <div className="text-4xl mb-3.5">🤖</div>
+                <div className="text-4xl mb-3.5"></div>
                 <h4 className="m-0 mb-1.5 text-sm font-semibold text-slate-500">Grounded RAG Interface Online</h4>
                 <p className="text-xs m-0 leading-relaxed text-slate-400">Ask standard maintenance procedures, troubleshooting codes, or threshold calibrations indexed from your engineering manuals.</p>
               </div>

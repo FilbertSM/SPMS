@@ -227,7 +227,6 @@ class SPMSChatEngine:
     def ask(self, question: str, machine_filter: str = None, target_language: str = "English") -> dict:
         
         # --- 1. CONDITIONAL QUERY TRANSLATION ---
-        # If the user toggled Indonesian, we must translate their query so the database understands it.
         if target_language.lower() != "english":
             print(f"\n[Tracer] 0. Translating query from {target_language} to English...")
             trans_prompt = f"Translate this technical factory question into English. Return ONLY the translation, no other text: {question}"
@@ -238,19 +237,30 @@ class SPMSChatEngine:
             else:
                 search_query = raw_content.strip()
         else:
-            # If the toggle is on English, skip translation entirely to save time!
             print("\n[Tracer] 0. English selected. Skipping translation.")
             search_query = question
             
         print(f"[Tracer] 0.5. Search Query is now: '{search_query}'")
 
         # --- 2. LOCAL DATABASE RETRIEVAL ---
-        # Always search using the English search_query
+        print(f"\n[Tracer] 1. Initiating Vector/BM25 Search...")
+        print(f"[Tracer] 1.5. STRICT FILTER APPLIED: Searching ONLY inside '{machine_filter}' documents.")
+        
         best_context_blocks = self.retrieve_and_rerank(search_query, machine_filter=machine_filter, top_k=3)
-        context_string = "\n\n---\n\n".join(best_context_blocks) if best_context_blocks else "No Context Found."
+        
+        if best_context_blocks:
+            print(f"\n[Tracer] 2. SUCCESS: Cross-Encoder approved {len(best_context_blocks)} high-quality context chunks.")
+            context_string = "\n\n---\n\n".join(best_context_blocks)
+            
+            # Print a preview of what we are handing to Gemini (first 500 characters)
+            print(f"[Tracer] 2.5. CONTEXT PREVIEW INJECTED INTO PROMPT:\n{'-'*50}\n{context_string[:500]}...\n{'-'*50}\n")
+        else:
+            print(f"\n[Tracer] 2. FAILURE: No context found! The database returned 0 chunks for '{machine_filter}'.")
+            context_string = "No Context Found."
 
         # --- 3. FINAL OUTPUT GENERATION ---
-        # We inject target_language so Gemini knows exactly what language to reply in
+        print(f"[Tracer] 3. Generating final response in {target_language}...")
+        
         generation_prompt = f"""
         You are a strict technical assistant for industrial machinery.
         Answer the user's question using ONLY the provided technical context.
@@ -271,13 +281,13 @@ class SPMSChatEngine:
         
         # --- THE JSON CLEANUP FIX ---
         final_text = raw_response.content
-        
-        # If Gemini returned a list instead of a string, extract the actual text!
         if isinstance(final_text, list):
             final_text = final_text[0].get("text", str(final_text[0]))
+            
+        print(f"[Tracer] 4. Generation Complete. Sending answer back to React UI.\n")
         
         return {
-            "answer": final_text, # Return the clean text
+            "answer": final_text,
             "metadata": {
                 "input_tokens": usage.get("input_tokens", 0),
                 "output_tokens": usage.get("output_tokens", 0),
