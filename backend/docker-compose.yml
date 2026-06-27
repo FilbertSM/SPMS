@@ -1,0 +1,91 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: spms-api:latest
+    container_name: spms_api_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Override the DB URL to point to the container network instead of localhost
+      - DATABASE_URL=mysql+pymysql://root:secure_maria_password@mariadb:3306/spms_db
+    ports:
+      - "8000:8000"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - spms_network
+    # Use Docker Compose layout configuration below to allow live reloading when developing (dev profile only)
+    profiles:
+      - production
+      - default
+
+  # ---------------------------------------------
+  # Development Override Profile
+  # ---------------------------------------------
+  api-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: spms-api:dev
+    container_name: spms_api_dev
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=mysql+pymysql://root:secure_maria_password@mariadb:3306/spms_db
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app/app # Live reload the app directory
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - spms_network
+    profiles:
+      - dev
+
+  # ---------------------------------------------
+  # Database Layer (MariaDB)
+  # ---------------------------------------------
+  mariadb:
+    image: mariadb:10.11
+    container_name: spms_mariadb
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: secure_maria_password
+      MARIADB_DATABASE: spms_db
+      MARIADB_USER: spms_user
+      MARIADB_PASSWORD: spms_secure_password
+    ports:
+      - "3308:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      # ADDED: Map the local folder for CSV imports
+      - ./simulation_csvs:/var/lib/mysql-files
+      # ADDED: Map the initialization script folder so MariaDB finds 01-init.sql
+      - ./db_init:/docker-entrypoint-initdb.d
+    # ADDED: Override strict security to allow the LOAD DATA command
+    command: --secure-file-priv=/var/lib/mysql-files
+    networks:
+      - spms_network
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  spms_network:
+    driver: bridge
+
+volumes:
+  mariadb_data:
+    driver: local

@@ -1,0 +1,11 @@
+# Local ML handoff artifacts
+data/*.csv
+data/*.npz
+saved_models/*
+!data/.gitkeep
+!saved_models/.gitkeep
+
+# Notebook/runtime noise
+.ipynb_checkpoints/
+__pycache__/
+*.py[cod]

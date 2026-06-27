@@ -10,3 +10,6 @@ env/
 .pytest_cache/
 *.pyc
 .env
+
+DOCS/
+graphify-out/

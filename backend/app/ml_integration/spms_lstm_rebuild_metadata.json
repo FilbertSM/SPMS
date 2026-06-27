@@ -1,0 +1,104 @@
+{
+  "raw_data_path": "Data/data/master_data.csv",
+  "clean_grid_path": "Data/data/spms_cleaned_full_grid.csv",
+  "window_metadata_path": "Data/data/spms_valid_windows_metadata.csv",
+  "window_tensor_path": "Data/data/spms_lstm_windows_rebuild.npz",
+  "model_path": "Data/export_models/spms_lstm_autoencoder_rebuild.keras",
+  "scaler_path": "Data/export_models/spms_minmax_scaler_rebuild.pkl",
+  "threshold_path": "Data/export_models/anomaly_threshold_rebuild.joblib",
+  "report_notebook_path": "Data/SPMS_LSTM_Autoencoder_Experimental_Report.ipynb",
+  "features": [
+    "impeller_rpm",
+    "chopper_rpm",
+    "impeller_ampere",
+    "X-Axis RMS Velocity (mm/s)",
+    "Z-Axis RMS Velocity (mm/s)",
+    "X-Axis Peak Acceleration (G)",
+    "Z-Axis Peak Acceleration (G)",
+    "Temperature C"
+  ],
+  "excluded_features": [
+    "X-Axis RMS Velocity (in/s)",
+    "Z-Axis RMS Velocity (in/s)"
+  ],
+  "window_size": 15,
+  "interpolation_policy": "Only complete NaN runs <= 2 minutes are linearly interpolated; macro-gaps remain NaN.",
+  "state_policy": {
+    "absolute_offline": "impeller_rpm == 0 and impeller_ampere == 0",
+    "active_running": "impeller_rpm >= 1.000000 and impeller_ampere >= 12.480000",
+    "chopper_policy": "reported as diagnostic; not used as a hard active-running filter in this rebuild because process-dependent chopper-off windows are common and a hard chopper filter leaves too few valid windows"
+  },
+  "split_dates": [
+    {
+      "split": "train",
+      "windows": "3483",
+      "first_window_start": "2025-05-30 21:26:00",
+      "first_window_end": "2025-05-30 21:40:00",
+      "last_window_start": "2025-11-06 22:45:00",
+      "last_window_end": "2025-11-06 22:59:00"
+    },
+    {
+      "split": "validation",
+      "windows": "746",
+      "first_window_start": "2025-11-07 22:32:00",
+      "first_window_end": "2025-11-07 22:46:00",
+      "last_window_start": "2026-02-20 14:45:00",
+      "last_window_end": "2026-02-20 14:59:00"
+    },
+    {
+      "split": "test",
+      "windows": "734",
+      "first_window_start": "2026-02-20 15:00:00",
+      "first_window_end": "2026-02-20 15:14:00",
+      "last_window_start": "2026-03-13 00:32:00",
+      "last_window_end": "2026-03-13 00:46:00"
+    }
+  ],
+  "valid_window_count": 4963,
+  "valid_window_count_before_split_embargo": 4977,
+  "windows_dropped_for_split_embargo": 14,
+  "skipped_window_count": 409729,
+  "skipped_window_reasons": {
+    "feature_nan": 51852,
+    "not_active_all_rows": 357448,
+    "cross_batch_or_missing_batch": 2,
+    "cross_process_or_missing_process": 427
+  },
+  "process_crossing_windows_retained": 0,
+  "windows_with_chopper_zero": 4710,
+  "threshold": 0.2241775095462799,
+  "threshold_policy": "99th percentile of validation reconstruction MAE",
+  "evaluation": [
+    {
+      "split": "train",
+      "windows": 3483,
+      "anomalies": 0,
+      "anomaly_rate": 0.0,
+      "mean_error": 0.03416971117258072,
+      "max_error": 0.13050195574760437
+    },
+    {
+      "split": "validation",
+      "windows": 746,
+      "anomalies": 8,
+      "anomaly_rate": 0.010723860589812333,
+      "mean_error": 0.0493428111076355,
+      "max_error": 0.2521207332611084
+    },
+    {
+      "split": "test",
+      "windows": 734,
+      "anomalies": 45,
+      "anomaly_rate": 0.06130790190735695,
+      "mean_error": 0.11893660575151443,
+      "max_error": 0.2717236578464508
+    }
+  ],
+  "limitations": [
+    "Unsupervised anomaly detection only.",
+    "No confirmed failure-label precision or recall.",
+    "No validated RUL output.",
+    "Valid windows are much fewer than compressed active-row windows because macro-gaps and inactive periods are rejected.",
+    "Chopper-off windows remain in this rebuild and must be reviewed with process experts before final production use."
+  ]
+}
