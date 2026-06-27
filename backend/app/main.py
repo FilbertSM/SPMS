@@ -63,11 +63,11 @@ limiter = Limiter(key_func=get_remote_address)
 
 # --- CONFIGURATION EMAIL ---
 conf = ConnectionConfig(
-    MAIL_USERNAME = "jason_a@smaknasionalanglo.sch.id",
-    MAIL_PASSWORD = "dpxfvzcuqlvncbmv",
-    MAIL_FROM = "jason_a@smaknasionalanglo.sch.id",
-    MAIL_PORT = 587,
-    MAIL_SERVER = "smtp.gmail.com",
+    MAIL_USERNAME = settings.MAIL_USERNAME,
+    MAIL_PASSWORD = settings.MAIL_PASSWORD,
+    MAIL_FROM = settings.MAIL_FROM,
+    MAIL_PORT = settings.MAIL_PORT,
+    MAIL_SERVER = settings.MAIL_SERVER,
     MAIL_STARTTLS = True,
     MAIL_SSL_TLS = False,
     USE_CREDENTIALS = True,
